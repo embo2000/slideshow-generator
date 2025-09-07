@@ -55,7 +55,7 @@ const MusicSelector: React.FC<MusicSelectorProps> = ({
         audio.src = track.url;
         audio.load();
       } else {
-        audioRefs[track.id].play().catch((error) => {
+        audioRefs[track.id].play().catch(() => {
           setPlayingTrack(null);
         });
       }
