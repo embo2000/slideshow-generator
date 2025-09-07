@@ -15,7 +15,10 @@ interface GoogleAuthResponse {
 class GoogleAuthService {
   private clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   private apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
-  private discoveryDoc = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
+  private discoveryDocs = [
+    'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest',
+    'https://www.googleapis.com/discovery/v1/apis/oauth2/v2/rest'
+  ];
   private scopes = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
   
   private gapi: any = null;
@@ -84,7 +87,7 @@ class GoogleAuthService {
     
     await this.gapi.client.init({
       apiKey: this.apiKey,
-      discoveryDocs: [this.discoveryDoc],
+      discoveryDocs: this.discoveryDocs,
     });
 
     this.tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
