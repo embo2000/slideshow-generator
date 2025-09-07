@@ -45,9 +45,6 @@ const WizardProgress: React.FC<WizardProgressProps> = ({
                   }`}>
                     {title}
                   </div>
-                  <div className="text-xs text-gray-500">
-                    Step {index + 1} of {totalSteps}
-                  </div>
                 </div>
               </div>
               {index < totalSteps - 1 && (
