@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Camera } from 'lucide-react';
+import { Camera, Save } from 'lucide-react';
 import WizardProgress from './components/WizardProgress';
 import WizardNavigation from './components/WizardNavigation';
 import ClassUploadStep from './components/ClassUploadStep';
@@ -9,6 +9,9 @@ import MusicStep from './components/MusicStep';
 import PreviewStep from './components/PreviewStep';
 import VideoGenerator from './components/VideoGenerator';
 import SettingsModal from './components/SettingsModal';
+import GoogleAuthButton from './components/GoogleAuthButton';
+import SlideshowManager from './components/SlideshowManager';
+import { googleAuthService, GoogleUser } from './services/googleAuth';
 import { ClassData, MusicTrack, BackgroundImage, TransitionType } from './types';
 
 const TRANSITION_TYPES: TransitionType[] = [
@@ -45,6 +48,8 @@ function App() {
   const [weeklyMusic, setWeeklyMusic] = useState<MusicTrack | null>(null);
   const [backgroundImage, setBackgroundImage] = useState<BackgroundImage | null>(null);
   const [selectedTransition, setSelectedTransition] = useState<TransitionType>(TRANSITION_TYPES[0]);
+  const [currentUser, setCurrentUser] = useState<GoogleUser | null>(null);
+  const [showSlideshowManager, setShowSlideshowManager] = useState(false);
 
   // Initialize weekly music selection
   useEffect(() => {
@@ -124,6 +129,21 @@ function App() {
       return getTotalPhotos() > 0;
     }
     return false;
+  };
+
+  const handleLoadSlideshow = (data: {
+    classData: ClassData;
+    selectedMusic: MusicTrack | null;
+    backgroundImage: BackgroundImage | null;
+    selectedTransition: TransitionType;
+    classes: string[];
+  }) => {
+    setClassData(data.classData);
+    setSelectedMusic(data.selectedMusic);
+    setBackgroundImage(data.backgroundImage);
+    setSelectedTransition(data.selectedTransition);
+    setClasses(data.classes);
+    setCurrentStep(0); // Reset to first step
   };
 
   const handleNext = () => {
@@ -220,10 +240,23 @@ function App() {
             
             <button
               onClick={() => setShowSettings(true)}
-              className="text-sm text-gray-600 hover:text-gray-900 underline"
+              className="text-sm text-gray-600 hover:text-gray-900 underline mr-4"
             >
               Manage Groups
             </button>
+            
+            <div className="flex items-center space-x-4">
+              {currentUser && (
+                <button
+                  onClick={() => setShowSlideshowManager(true)}
+                  className="inline-flex items-center px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <Save className="h-4 w-4 mr-1" />
+                  My Slideshows
+                </button>
+              )}
+              <GoogleAuthButton onAuthChange={setCurrentUser} />
+            </div>
           </div>
         </div>
       </header>
@@ -259,6 +292,20 @@ function App() {
           classes={classes}
           onUpdateClasses={setClasses}
           onClose={() => setShowSettings(false)}
+        />
+      )}
+
+      {showSlideshowManager && (
+        <SlideshowManager
+          currentSlideshow={{
+            classData,
+            selectedMusic,
+            backgroundImage,
+            selectedTransition,
+            classes,
+          }}
+          onLoadSlideshow={handleLoadSlideshow}
+          onClose={() => setShowSlideshowManager(false)}
         />
       )}
 
