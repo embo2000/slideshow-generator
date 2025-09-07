@@ -9,17 +9,26 @@ interface GoogleAuthButtonProps {
 const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({ onAuthChange }) => {
   const [user, setUser] = useState<GoogleUser | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
+  const [isInitializing, setIsInitializing] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
 
   useEffect(() => {
     const initializeAuth = async () => {
+      setIsInitializing(true);
+      setInitError(null);
       try {
+        // Check if we have the required environment variables
+        if (!import.meta.env.VITE_GOOGLE_CLIENT_ID || !import.meta.env.VITE_GOOGLE_API_KEY) {
+          throw new Error('Google API credentials not configured');
+        }
+        
         await googleAuthService.initialize();
         const currentUser = googleAuthService.getCurrentUser();
         setUser(currentUser);
         onAuthChange?.(currentUser);
       } catch (error) {
         console.error('Failed to initialize Google Auth:', error);
+        setInitError(error instanceof Error ? error.message : 'Failed to initialize Google Auth');
       } finally {
         setIsInitializing(false);
       }
@@ -55,11 +64,20 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({ onAuthChange }) => 
     }
   };
 
+  // Show error state if initialization failed
+  if (initError) {
+    return (
+      <div className="flex items-center space-x-2 text-red-500">
+        <span className="text-sm">Google Auth unavailable</span>
+      </div>
+    );
+  }
+
   if (isInitializing) {
     return (
       <div className="flex items-center space-x-2 text-gray-500">
         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-        <span className="text-sm">Loading...</span>
+        <span className="text-sm">Initializing...</span>
       </div>
     );
   }

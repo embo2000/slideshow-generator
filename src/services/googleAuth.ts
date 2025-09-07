@@ -25,23 +25,50 @@ class GoogleAuthService {
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
+    // Check if required environment variables are present
+    if (!this.clientId || !this.apiKey) {
+      throw new Error('Google API credentials not configured. Please set VITE_GOOGLE_CLIENT_ID and VITE_GOOGLE_API_KEY in your .env file.');
+    }
+
     return new Promise((resolve, reject) => {
+      // Set a timeout for script loading
+      const timeout = setTimeout(() => {
+        reject(new Error('Google API scripts failed to load within 10 seconds'));
+      }, 10000);
+
       const script = document.createElement('script');
       script.src = 'https://apis.google.com/js/api.js';
       script.onload = async () => {
-        await this.loadGapi();
-        
-        const gsiScript = document.createElement('script');
-        gsiScript.src = 'https://accounts.google.com/gsi/client';
-        gsiScript.onload = async () => {
-          await this.initializeGapi();
-          this.isInitialized = true;
-          resolve();
-        };
-        gsiScript.onerror = reject;
-        document.head.appendChild(gsiScript);
+        try {
+          await this.loadGapi();
+          
+          const gsiScript = document.createElement('script');
+          gsiScript.src = 'https://accounts.google.com/gsi/client';
+          gsiScript.onload = async () => {
+            try {
+              await this.initializeGapi();
+              this.isInitialized = true;
+              clearTimeout(timeout);
+              resolve();
+            } catch (error) {
+              clearTimeout(timeout);
+              reject(error);
+            }
+          };
+          gsiScript.onerror = () => {
+            clearTimeout(timeout);
+            reject(new Error('Failed to load Google Sign-In script'));
+          };
+          document.head.appendChild(gsiScript);
+        } catch (error) {
+          clearTimeout(timeout);
+          reject(error);
+        }
       };
-      script.onerror = reject;
+      script.onerror = () => {
+        clearTimeout(timeout);
+        reject(new Error('Failed to load Google API script'));
+      };
       document.head.appendChild(script);
     });
   }
