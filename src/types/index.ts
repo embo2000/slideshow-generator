@@ -26,3 +26,10 @@ export interface TransitionType {
   name: string;
   description: string;
 }
+
+export interface WizardStep {
+  id: string;
+  title: string;
+  description: string;
+  completed: boolean;
+}

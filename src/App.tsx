@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Play, Download, Music, Camera, Plus, X, Edit } from 'lucide-react';
-import ClassCard from './components/ClassCard';
-import BackgroundSelector from './components/BackgroundSelector';
-import TransitionSelector from './components/TransitionSelector';
-import SettingsModal from './components/SettingsModal';
+import { Camera } from 'lucide-react';
+import WizardProgress from './components/WizardProgress';
+import WizardNavigation from './components/WizardNavigation';
+import ClassUploadStep from './components/ClassUploadStep';
+import TransitionStep from './components/TransitionStep';
+import BackgroundStep from './components/BackgroundStep';
+import MusicStep from './components/MusicStep';
+import PreviewStep from './components/PreviewStep';
 import VideoGenerator from './components/VideoGenerator';
-import MusicSelector from './components/MusicSelector';
+import SettingsModal from './components/SettingsModal';
 import { ClassData, MusicTrack, BackgroundImage, TransitionType } from './types';
 
 const TRANSITION_TYPES: TransitionType[] = [
@@ -21,12 +24,7 @@ const DEFAULT_CLASSES = [
   'Young Warriors (6-8 years)', 
   'Junior Karate (9-12 years)',
   'Teen Karate (13-17 years)',
-  'Adult Beginners',
-  'Intermediate Adults',
-  'Advanced Adults',
-  'Competition Team',
-  'Black Belt Class',
-  'Instructor Training'
+  'Adult Beginners'
 ];
 
 const MUSIC_TRACKS: MusicTrack[] = [
@@ -40,8 +38,9 @@ const MUSIC_TRACKS: MusicTrack[] = [
 function App() {
   const [classes, setClasses] = useState<string[]>(DEFAULT_CLASSES);
   const [classData, setClassData] = useState<ClassData>({});
-  const [showSettings, setShowSettings] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
   const [showVideoGenerator, setShowVideoGenerator] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [selectedMusic, setSelectedMusic] = useState<MusicTrack | null>(null);
   const [weeklyMusic, setWeeklyMusic] = useState<MusicTrack | null>(null);
   const [backgroundImage, setBackgroundImage] = useState<BackgroundImage | null>(null);
@@ -75,126 +74,183 @@ function App() {
     return Object.values(classData).reduce((total, photos) => total + photos.length, 0);
   };
 
-  const hasPhotos = getTotalPhotos() > 0;
+  const getClassesWithPhotos = () => {
+    return classes.filter(className => (classData[className] || []).length > 0);
+  };
+
+  // Calculate total steps: classes + transitions + background + music + preview
+  const totalSteps = classes.length + 4;
+  
+  // Generate step titles
+  const getStepTitles = () => {
+    const classTitles = classes.map((className, index) => `${className.split(' ')[0]} ${className.split(' ')[1] || 'Class'}`);
+    return [...classTitles, 'Transitions', 'Background', 'Music', 'Preview'];
+  };
+
+  const getCompletedSteps = () => {
+    const completed = new Array(totalSteps).fill(false);
+    
+    // Mark class steps as completed if they have photos
+    classes.forEach((className, index) => {
+      if ((classData[className] || []).length > 0) {
+        completed[index] = true;
+      }
+    });
+    
+    // Mark other steps as completed
+    completed[classes.length] = true; // Transitions (always has default)
+    completed[classes.length + 1] = true; // Background (optional)
+    completed[classes.length + 2] = selectedMusic !== null; // Music
+    completed[classes.length + 3] = getTotalPhotos() > 0; // Preview
+    
+    return completed;
+  };
+
+  const canProceedFromCurrentStep = () => {
+    if (currentStep < classes.length) {
+      // For class steps, allow proceeding even without photos (optional)
+      return true;
+    } else if (currentStep === classes.length) {
+      // Transitions step - always can proceed (has default)
+      return true;
+    } else if (currentStep === classes.length + 1) {
+      // Background step - always can proceed (optional)
+      return true;
+    } else if (currentStep === classes.length + 2) {
+      // Music step - always can proceed (optional)
+      return true;
+    } else if (currentStep === classes.length + 3) {
+      // Preview step - need at least one photo
+      return getTotalPhotos() > 0;
+    }
+    return false;
+  };
+
+  const handleNext = () => {
+    if (currentStep < totalSteps - 1) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const handleEditStep = (stepIndex: number) => {
+    setCurrentStep(stepIndex);
+  };
 
   const generateVideo = () => {
-    if (!hasPhotos) return;
+    if (getTotalPhotos() === 0) return;
     setShowVideoGenerator(true);
+  };
+
+  const renderCurrentStep = () => {
+    if (currentStep < classes.length) {
+      // Class upload steps
+      const className = classes[currentStep];
+      return (
+        <ClassUploadStep
+          className={className}
+          photos={classData[className] || []}
+          onPhotosUpdate={(photos) => updateClassPhotos(className, photos)}
+          stepNumber={currentStep + 1}
+          totalClasses={classes.length}
+        />
+      );
+    } else if (currentStep === classes.length) {
+      // Transitions step
+      return (
+        <TransitionStep
+          selectedTransition={selectedTransition}
+          transitionTypes={TRANSITION_TYPES}
+          onTransitionUpdate={setSelectedTransition}
+        />
+      );
+    } else if (currentStep === classes.length + 1) {
+      // Background step
+      return (
+        <BackgroundStep
+          backgroundImage={backgroundImage}
+          onBackgroundImageUpdate={setBackgroundImage}
+        />
+      );
+    } else if (currentStep === classes.length + 2) {
+      // Music step
+      return (
+        <MusicStep
+          tracks={MUSIC_TRACKS}
+          selectedTrack={selectedMusic}
+          weeklyTrack={weeklyMusic}
+          onSelectTrack={setSelectedMusic}
+        />
+      );
+    } else if (currentStep === classes.length + 3) {
+      // Preview step
+      return (
+        <PreviewStep
+          classData={classData}
+          selectedMusic={selectedMusic}
+          backgroundImage={backgroundImage}
+          selectedTransition={selectedTransition}
+          onGenerate={generateVideo}
+          onEdit={handleEditStep}
+        />
+      );
+    }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-blue-600 rounded-lg">
                 <Camera className="h-6 w-6 text-white" />
               </div>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">Slideshow Generator</h1>
-                <p className="text-sm text-gray-500">Create beautiful photo slideshows</p>
+                <p className="text-sm text-gray-500">Create beautiful photo slideshows step by step</p>
               </div>
             </div>
             
-            <div className="flex items-center space-x-3">
-              {hasPhotos && (
-                <button
-                  onClick={generateVideo}
-                  className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors duration-200 shadow-sm"
-                >
-                  <Play className="h-4 w-4 mr-2" />
-                  Generate Video
-                </button>
-              )}
-              
-              <button
-                onClick={() => setShowSettings(true)}
-                className="inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors duration-200 shadow-sm"
-              >
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
-              </button>
-            </div>
+            <button
+              onClick={() => setShowSettings(true)}
+              className="text-sm text-gray-600 hover:text-gray-900 underline"
+            >
+              Manage Classes
+            </button>
           </div>
         </div>
       </header>
 
+      {/* Wizard Progress */}
+      <WizardProgress
+        currentStep={currentStep}
+        totalSteps={totalSteps}
+        stepTitles={getStepTitles()}
+        completedSteps={getCompletedSteps()}
+      />
+
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Bar */}
-        <div className="mb-8 bg-white rounded-xl p-6 shadow-sm border">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-blue-600">{classes.length}</div>
-              <div className="text-sm text-gray-500">Total Classes</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-green-600">{getTotalPhotos()}</div>
-              <div className="text-sm text-gray-500">Photos Uploaded</div>
-            </div>
-            <div className="text-center">
-              <div className="flex items-center justify-center space-x-2">
-                <Music className="h-5 w-5 text-orange-600" />
-                <div className="text-sm font-medium text-gray-700">
-                  {weeklyMusic?.name || 'No music selected'}
-                </div>
-              </div>
-              <div className="text-sm text-gray-500">This Week's Music</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Music Selector */}
-        <MusicSelector
-          tracks={MUSIC_TRACKS}
-          selectedTrack={selectedMusic}
-          weeklyTrack={weeklyMusic}
-          onSelectTrack={setSelectedMusic}
-        />
-
-        {/* Background Image Selector */}
-        <BackgroundSelector
-          backgroundImage={backgroundImage}
-          onBackgroundImageUpdate={setBackgroundImage}
-        />
-
-        {/* Transition Selector */}
-        <TransitionSelector
-          selectedTransition={selectedTransition}
-          transitionTypes={TRANSITION_TYPES}
-          onTransitionUpdate={setSelectedTransition}
-        />
-
-        {/* Classes Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {classes.map((className) => (
-            <ClassCard
-              key={className}
-              className={className}
-              photos={classData[className] || []}
-              onPhotosUpdate={(photos) => updateClassPhotos(className, photos)}
-            />
-          ))}
-        </div>
-
-        {/* Empty State */}
-        {classes.length === 0 && (
-          <div className="text-center py-12">
-            <Camera className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No classes configured</h3>
-            <p className="text-gray-500 mb-6">Add classes in settings to get started</p>
-            <button
-              onClick={() => setShowSettings(true)}
-              className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors duration-200"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Classes
-            </button>
-          </div>
-        )}
+      <main className="min-h-[calc(100vh-200px)]">
+        {renderCurrentStep()}
       </main>
+
+      {/* Navigation */}
+      <WizardNavigation
+        currentStep={currentStep}
+        totalSteps={totalSteps}
+        canProceed={canProceedFromCurrentStep()}
+        onPrevious={handlePrevious}
+        onNext={handleNext}
+        onGenerate={generateVideo}
+        isLastStep={currentStep === totalSteps - 1}
+      />
 
       {/* Modals */}
       {showSettings && (
