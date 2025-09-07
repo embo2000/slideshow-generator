@@ -18,8 +18,8 @@ const WizardProgress: React.FC<WizardProgressProps> = ({
 }) => {
   return (
     <div className="bg-white border-b shadow-sm">
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        <div className="flex items-center justify-between">
+      <div className="max-w-4xl mx-auto px-4 py-6 overflow-x-auto">
+        <div className="flex items-center justify-between min-w-max">
           {stepTitles.map((title, index) => (
             <React.Fragment key={index}>
               <div 
