@@ -39,10 +39,10 @@ const WizardProgress: React.FC<WizardProgressProps> = ({
                     <span className="text-sm font-medium">{index + 1}</span>
                   )}
                 </div>
-                <div className="ml-3">
+                <div className="ml-3 min-w-0 flex-1">
                   <div className={`text-[10px] font-medium leading-tight ${
                     index <= currentStep ? 'text-gray-900' : 'text-gray-500'
-                  }`}>
+                  } break-words`}>
                     {title}
                   </div>
                 </div>
