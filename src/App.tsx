@@ -234,6 +234,7 @@ function App() {
         totalSteps={totalSteps}
         stepTitles={getStepTitles()}
         completedSteps={getCompletedSteps()}
+        onStepClick={setCurrentStep}
       />
 
       {/* Main Content */}

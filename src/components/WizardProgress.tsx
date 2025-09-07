@@ -6,13 +6,15 @@ interface WizardProgressProps {
   totalSteps: number;
   stepTitles: string[];
   completedSteps: boolean[];
+  onStepClick?: (stepIndex: number) => void;
 }
 
 const WizardProgress: React.FC<WizardProgressProps> = ({
   currentStep,
   totalSteps,
   stepTitles,
-  completedSteps
+  completedSteps,
+  onStepClick
 }) => {
   return (
     <div className="bg-white border-b shadow-sm">
@@ -20,7 +22,10 @@ const WizardProgress: React.FC<WizardProgressProps> = ({
         <div className="flex items-center justify-between">
           {stepTitles.map((title, index) => (
             <React.Fragment key={index}>
-              <div className="flex items-center">
+              <div 
+                className={`flex items-center ${onStepClick ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                onClick={() => onStepClick?.(index)}
+              >
                 <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-200 ${
                   index < currentStep 
                     ? 'bg-green-500 border-green-500 text-white' 
