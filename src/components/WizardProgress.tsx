@@ -19,11 +19,11 @@ const WizardProgress: React.FC<WizardProgressProps> = ({
   return (
     <div className="bg-white border-b shadow-sm">
       <div className="max-w-4xl mx-auto px-4 py-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2 overflow-x-auto">
           {stepTitles.map((title, index) => (
             <React.Fragment key={index}>
               <div 
-                className={`flex items-center ${onStepClick ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                className={`flex items-center min-w-0 flex-shrink-0 ${onStepClick ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
                 onClick={() => onStepClick?.(index)}
               >
                 <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-200 ${
@@ -39,7 +39,7 @@ const WizardProgress: React.FC<WizardProgressProps> = ({
                     <span className="text-sm font-medium">{index + 1}</span>
                   )}
                 </div>
-                <div className="ml-3 min-w-0 flex-1">
+                <div className="ml-3 min-w-0 w-20">
                   <div className={`text-[10px] font-medium leading-tight ${
                     index <= currentStep ? 'text-gray-900' : 'text-gray-500'
                   } break-words`}>
@@ -48,7 +48,7 @@ const WizardProgress: React.FC<WizardProgressProps> = ({
                 </div>
               </div>
               {index < totalSteps - 1 && (
-                <ChevronRight className="h-5 w-5 text-gray-400 mx-2" />
+                <ChevronRight className="h-4 w-4 text-gray-400 mx-1 flex-shrink-0" />
               )}
             </React.Fragment>
           ))}
