@@ -83,7 +83,7 @@ function App() {
   
   // Generate step titles
   const getStepTitles = () => {
-    const groupTitles = classes.map((groupName, index) => `${groupName.split(' ')[0]} ${groupName.split(' ')[1] || 'Group'}`);
+    const groupTitles = classes.map((groupName, index) => `${groupName}`);
     return [...groupTitles, 'Transitions', 'Background', 'Music', 'Preview'];
   };
 
