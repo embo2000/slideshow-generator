@@ -4,7 +4,15 @@ import ClassCard from './components/ClassCard';
 import SettingsModal from './components/SettingsModal';
 import VideoGenerator from './components/VideoGenerator';
 import MusicSelector from './components/MusicSelector';
-import { ClassData, MusicTrack } from './types';
+import { ClassData, MusicTrack, BackgroundImage, TransitionType } from './types';
+
+const TRANSITION_TYPES: TransitionType[] = [
+  { id: 'fade', name: 'Fade', description: 'Smooth fade between images' },
+  { id: 'slide', name: 'Slide', description: 'Slide images from side to side' },
+  { id: 'zoom', name: 'Zoom', description: 'Zoom in/out effect' },
+  { id: 'flip', name: 'Flip', description: '3D flip transition' },
+  { id: 'dissolve', name: 'Dissolve', description: 'Pixelated dissolve effect' }
+];
 
 const DEFAULT_CLASSES = [
   'Little Dragons (3-5 years)',
@@ -34,6 +42,8 @@ function App() {
   const [showVideoGenerator, setShowVideoGenerator] = useState(false);
   const [selectedMusic, setSelectedMusic] = useState<MusicTrack | null>(null);
   const [weeklyMusic, setWeeklyMusic] = useState<MusicTrack | null>(null);
+  const [backgroundImage, setBackgroundImage] = useState<BackgroundImage | null>(null);
+  const [selectedTransition, setSelectedTransition] = useState<TransitionType>(TRANSITION_TYPES[0]);
 
   // Initialize weekly music selection
   useEffect(() => {
@@ -184,7 +194,22 @@ function App() {
         <VideoGenerator
           classData={classData}
           selectedMusic={selectedMusic}
+          backgroundImage={backgroundImage}
+          selectedTransition={selectedTransition}
           onClose={() => setShowVideoGenerator(false)}
+        />
+      )}
+
+      {showSettings && (
+        <SettingsModal
+          classes={classes}
+          onUpdateClasses={setClasses}
+          backgroundImage={backgroundImage}
+          onBackgroundImageUpdate={setBackgroundImage}
+          selectedTransition={selectedTransition}
+          transitionTypes={TRANSITION_TYPES}
+          onTransitionUpdate={setSelectedTransition}
+          onClose={() => setShowSettings(false)}
         />
       )}
     </div>

@@ -15,3 +15,14 @@ export interface VideoSettings {
   fps: number;
   duration: number;
 }
+
+export interface BackgroundImage {
+  file: File;
+  url: string;
+}
+
+export interface TransitionType {
+  id: string;
+  name: string;
+  description: string;
+}
