@@ -60,7 +60,7 @@ const ClassUploadStep: React.FC<ClassUploadStepProps> = ({
   return (
     <WizardStepWrapper
       title={`Upload Photos for ${className}`}
-      description={`Step ${stepNumber} of ${totalClasses} classes - Add up to 5 photos for this class`}
+      description={`Step ${stepNumber} of ${totalClasses} image groups - Add up to 5 photos for this group`}
     >
       <div className="space-y-6">
         {/* Photo Grid */}

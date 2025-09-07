@@ -20,11 +20,11 @@ const TRANSITION_TYPES: TransitionType[] = [
 ];
 
 const DEFAULT_CLASSES = [
-  'Little Dragons (3-5 years)',
-  'Young Warriors (6-8 years)', 
-  'Junior Karate (9-12 years)',
-  'Teen Karate (13-17 years)',
-  'Adult Beginners'
+  'Image Group 1',
+  'Image Group 2', 
+  'Image Group 3',
+  'Image Group 4',
+  'Image Group 5'
 ];
 
 const MUSIC_TRACKS: MusicTrack[] = [
@@ -75,24 +75,24 @@ function App() {
   };
 
   const getClassesWithPhotos = () => {
-    return classes.filter(className => (classData[className] || []).length > 0);
+    return classes.filter(groupName => (classData[groupName] || []).length > 0);
   };
 
-  // Calculate total steps: classes + transitions + background + music + preview
+  // Calculate total steps: image groups + transitions + background + music + preview
   const totalSteps = classes.length + 4;
   
   // Generate step titles
   const getStepTitles = () => {
-    const classTitles = classes.map((className, index) => `${className.split(' ')[0]} ${className.split(' ')[1] || 'Class'}`);
-    return [...classTitles, 'Transitions', 'Background', 'Music', 'Preview'];
+    const groupTitles = classes.map((groupName, index) => `${groupName.split(' ')[0]} ${groupName.split(' ')[1] || 'Group'}`);
+    return [...groupTitles, 'Transitions', 'Background', 'Music', 'Preview'];
   };
 
   const getCompletedSteps = () => {
     const completed = new Array(totalSteps).fill(false);
     
-    // Mark class steps as completed if they have photos
-    classes.forEach((className, index) => {
-      if ((classData[className] || []).length > 0) {
+    // Mark image group steps as completed if they have photos
+    classes.forEach((groupName, index) => {
+      if ((classData[groupName] || []).length > 0) {
         completed[index] = true;
       }
     });
@@ -108,7 +108,7 @@ function App() {
 
   const canProceedFromCurrentStep = () => {
     if (currentStep < classes.length) {
-      // For class steps, allow proceeding even without photos (optional)
+      // For image group steps, allow proceeding even without photos (optional)
       return true;
     } else if (currentStep === classes.length) {
       // Transitions step - always can proceed (has default)
@@ -149,13 +149,13 @@ function App() {
 
   const renderCurrentStep = () => {
     if (currentStep < classes.length) {
-      // Class upload steps
-      const className = classes[currentStep];
+      // Image group upload steps
+      const groupName = classes[currentStep];
       return (
         <ClassUploadStep
-          className={className}
-          photos={classData[className] || []}
-          onPhotosUpdate={(photos) => updateClassPhotos(className, photos)}
+          className={groupName}
+          photos={classData[groupName] || []}
+          onPhotosUpdate={(photos) => updateClassPhotos(groupName, photos)}
           stepNumber={currentStep + 1}
           totalClasses={classes.length}
         />
@@ -222,7 +222,7 @@ function App() {
               onClick={() => setShowSettings(true)}
               className="text-sm text-gray-600 hover:text-gray-900 underline"
             >
-              Manage Classes
+              Manage Groups
             </button>
           </div>
         </div>

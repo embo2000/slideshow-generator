@@ -42,7 +42,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
               <span className="font-medium text-blue-900">Photos</span>
             </div>
             <div className="text-2xl font-bold text-blue-600">{getTotalPhotos()}</div>
-            <div className="text-sm text-blue-700">{getClassesWithPhotos().length} classes</div>
+            <div className="text-sm text-blue-700">{getClassesWithPhotos().length} groups</div>
           </div>
 
           <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
@@ -81,14 +81,14 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
 
         {/* Class Photos Preview */}
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Photos by Class</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Photos by Image Group</h3>
           <div className="space-y-4">
-            {getClassesWithPhotos().map(([className, photos], classIndex) => (
-              <div key={className} className="bg-gray-50 p-4 rounded-lg">
+            {getClassesWithPhotos().map(([groupName, photos], groupIndex) => (
+              <div key={groupName} className="bg-gray-50 p-4 rounded-lg">
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-medium text-gray-900">{className}</h4>
+                  <h4 className="font-medium text-gray-900">{groupName}</h4>
                   <button
-                    onClick={() => onEdit(classIndex)}
+                    onClick={() => onEdit(groupIndex)}
                     className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center space-x-1"
                   >
                     <Edit className="h-4 w-4" />
@@ -100,7 +100,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
                     <img
                       key={index}
                       src={URL.createObjectURL(photo)}
-                      alt={`${className} photo ${index + 1}`}
+                      alt={`${groupName} photo ${index + 1}`}
                       className="w-full aspect-square object-cover rounded border"
                     />
                   ))}
