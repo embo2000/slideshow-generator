@@ -212,6 +212,8 @@ function App() {
           backgroundImage={backgroundImage}
           selectedTransition={selectedTransition}
           onClose={() => setShowVideoGenerator(false)}
+        />
+      )}
     </div>
   );
 }
