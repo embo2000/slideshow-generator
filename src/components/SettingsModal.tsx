@@ -150,6 +150,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           )}
 
           {/* Transitions Tab */}
+          {activeTab === 'transitions' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-4">
                 Transition Effects
