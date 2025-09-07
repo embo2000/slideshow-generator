@@ -5,8 +5,6 @@ import { BackgroundImage, TransitionType } from '../types';
 interface SettingsModalProps {
   classes: string[];
   onUpdateClasses: (classes: string[]) => void;
-  backgroundImage: BackgroundImage | null;
-  onBackgroundImageUpdate: (image: BackgroundImage | null) => void;
   selectedTransition: TransitionType;
   transitionTypes: TransitionType[];
   onTransitionUpdate: (transition: TransitionType) => void;
@@ -16,8 +14,6 @@ interface SettingsModalProps {
 const SettingsModal: React.FC<SettingsModalProps> = ({ 
   classes, 
   onUpdateClasses, 
-  backgroundImage,
-  onBackgroundImageUpdate,
   selectedTransition,
   transitionTypes,
   onTransitionUpdate,
@@ -25,7 +21,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const [localClasses, setLocalClasses] = useState<string[]>([...classes]);
   const [newClassName, setNewClassName] = useState('');
-  const [activeTab, setActiveTab] = useState<'classes' | 'background' | 'transitions'>('classes');
+  const [activeTab, setActiveTab] = useState<'classes' | 'transitions'>('classes');
 
   const handleAddClass = () => {
     if (newClassName.trim() && !localClasses.includes(newClassName.trim())) {
@@ -55,21 +51,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const handleBackgroundImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && file.type.startsWith('image/')) {
-      const url = URL.createObjectURL(file);
-      onBackgroundImageUpdate({ file, url });
-    }
-  };
-
-  const removeBackgroundImage = () => {
-    if (backgroundImage) {
-      URL.revokeObjectURL(backgroundImage.url);
-      onBackgroundImageUpdate(null);
-    }
-  };
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col">
@@ -94,16 +75,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             }`}
           >
             Classes
-          </button>
-          <button
-            onClick={() => setActiveTab('background')}
-            className={`px-6 py-3 font-medium transition-colors ${
-              activeTab === 'background'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Background
           </button>
           <button
             onClick={() => setActiveTab('transitions')}
@@ -178,56 +149,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
-          {/* Background Tab */}
-          {activeTab === 'background' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-4">
-                Background Image
-              </label>
-              
-              {backgroundImage ? (
-                <div className="space-y-4">
-                  <div className="relative">
-                    <img
-                      src={backgroundImage.url}
-                      alt="Background"
-                      className="w-full h-48 object-cover rounded-lg border"
-                    />
-                    <button
-                      onClick={removeBackgroundImage}
-                      className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-2 shadow-lg transition-colors"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    Background image will be used behind all photos in the slideshow
-                  </p>
-                </div>
-              ) : (
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                  <Image className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No background image</h3>
-                  <p className="text-gray-500 mb-4">
-                    Upload a background image to enhance your slideshow
-                  </p>
-                  <label className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium cursor-pointer transition-colors">
-                    <Upload className="h-4 w-4 mr-2" />
-                    Choose Image
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleBackgroundImageUpload}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Transitions Tab */}
-          {activeTab === 'transitions' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-4">
                 Transition Effects

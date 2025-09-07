@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Play, Download, Music, Camera, Plus, X, Edit } from 'lucide-react';
 import ClassCard from './components/ClassCard';
+import BackgroundSelector from './components/BackgroundSelector';
 import SettingsModal from './components/SettingsModal';
 import VideoGenerator from './components/VideoGenerator';
 import MusicSelector from './components/MusicSelector';
@@ -152,6 +153,12 @@ function App() {
           onSelectTrack={setSelectedMusic}
         />
 
+        {/* Background Image Selector */}
+        <BackgroundSelector
+          backgroundImage={backgroundImage}
+          onBackgroundImageUpdate={setBackgroundImage}
+        />
+
         {/* Classes Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {classes.map((className) => (
@@ -204,8 +211,6 @@ function App() {
         <SettingsModal
           classes={classes}
           onUpdateClasses={setClasses}
-          backgroundImage={backgroundImage}
-          onBackgroundImageUpdate={setBackgroundImage}
           selectedTransition={selectedTransition}
           transitionTypes={TRANSITION_TYPES}
           onTransitionUpdate={setSelectedTransition}
