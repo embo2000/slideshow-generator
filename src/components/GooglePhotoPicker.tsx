@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Camera, X } from 'lucide-react';
+import { Camera, X, AlertCircle } from 'lucide-react';
 import { googlePhotosPickerService } from '../services/googlePhotos';
 import { googleAuthService } from '../services/googleAuth';
 
@@ -15,14 +15,17 @@ const GooglePhotoPicker: React.FC<GooglePhotoPickerProps> = ({
   maxPhotos
 }) => {
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleOpenPicker = async () => {
     if (!googleAuthService.isSignedIn()) {
-      alert('Please sign in with Google first');
+      setError('Please sign in with Google first');
       return;
     }
 
     setIsLoading(true);
+    setError(null);
+    
     try {
       const selectedPhotos = await googlePhotosPickerService.openPhotoPicker();
       
@@ -34,12 +37,12 @@ const GooglePhotoPicker: React.FC<GooglePhotoPickerProps> = ({
         if (selectedPhotos.length > maxPhotos) {
           alert(`Selected ${selectedPhotos.length} photos, but only ${maxPhotos} were added due to the limit.`);
         }
+        
+        onClose();
       }
-      
-      onClose();
     } catch (error) {
       console.error('Failed to select photos:', error);
-      alert('Failed to select photos from Google Photos. Please try again.');
+      setError(error instanceof Error ? error.message : 'Failed to select photos from Google Photos');
     } finally {
       setIsLoading(false);
     }
@@ -97,6 +100,13 @@ const GooglePhotoPicker: React.FC<GooglePhotoPickerProps> = ({
             Select up to {maxPhotos} photo{maxPhotos !== 1 ? 's' : ''} from your Google Photos library.
           </p>
 
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2">
+              <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+
           <button
             onClick={handleOpenPicker}
             disabled={isLoading}
@@ -118,6 +128,12 @@ const GooglePhotoPicker: React.FC<GooglePhotoPickerProps> = ({
           <p className="text-sm text-gray-500 mt-4">
             This will open Google's photo picker where you can browse and select your photos.
           </p>
+
+          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-xs text-yellow-700">
+              <strong>Note:</strong> Make sure you've enabled the Google Picker API in your Google Cloud Console and added your domain to authorized origins.
+            </p>
+          </div>
         </div>
       </div>
     </div>

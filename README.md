@@ -25,13 +25,16 @@ To enable Google Drive integration for saving and loading slideshows:
 
 ## Google Photos Setup
 
-To enable Google Photos Picker integration for selecting photos:
+To enable Google Photos Picker integration:
 
-1. In the Google Cloud Console project
-2. Enable the **Google Picker API** 
-3. The same OAuth 2.0 Client ID will work
-4. Make sure your domain is in the authorized origins
-5. The Google Photos Picker will use the standard Google Picker interface
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
+2. In your existing project, enable these APIs:
+   - **Google Picker API**
+   - **Google Drive API** (required for Picker to work)
+3. In your OAuth 2.0 Client ID configuration:
+   - Add your domain to **Authorized JavaScript origins**
+   - Make sure both `http://localhost:5173` and your production domain are listed
+4. The Google Photos Picker will use Google's native picker interface
 
 ### Environment Variables
 
