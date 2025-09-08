@@ -22,9 +22,15 @@ export interface SlideshowData {
   };
 }
 
+export interface GroupsSettings {
+  classes: string[];
+  updatedAt: string;
+}
+
 class GoogleDriveService {
   private folderName = "Slideshow Generator";
   private folderId: string | null = null;
+  private settingsFileName = "groups-settings.json";
 
   private async getToken(): Promise<string> {
     const token = googleAuthService.getAccessToken();
@@ -194,6 +200,101 @@ class GoogleDriveService {
     
     console.log('Filtered JSON files:', jsonFiles);
     return jsonFiles;
+  }
+
+  async saveGroupsSettings(classes: string[]): Promise<void> {
+    const token = await this.getToken();
+    const folderId = await this.ensureFolder();
+
+    const settingsData: GroupsSettings = {
+      classes,
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Check if settings file already exists
+    const searchRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+        `name='${this.settingsFileName}' and '${folderId}' in parents and trashed=false`
+      )}&fields=files(id)`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    const searchData = await searchRes.json();
+    const existingFileId = searchData.files?.[0]?.id;
+
+    const metadata = {
+      name: this.settingsFileName,
+      ...(existingFileId ? {} : { parents: [folderId] }),
+      mimeType: "application/json",
+    };
+
+    const boundary = "-------314159265358979323846";
+    const delimiter = `\r\n--${boundary}\r\n`;
+    const closeDelim = `\r\n--${boundary}--`;
+
+    const body =
+      delimiter +
+      "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
+      JSON.stringify(metadata) +
+      delimiter +
+      "Content-Type: application/json\r\n\r\n" +
+      JSON.stringify(settingsData) +
+      closeDelim;
+
+    const url = existingFileId
+      ? `https://www.googleapis.com/upload/drive/v3/files/${existingFileId}?uploadType=multipart`
+      : "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart";
+
+    const method = existingFileId ? "PATCH" : "POST";
+
+    await fetch(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": `multipart/related; boundary=${boundary}`,
+      },
+      body,
+    });
+  }
+
+  async loadGroupsSettings(): Promise<string[] | null> {
+    try {
+      const token = await this.getToken();
+      const folderId = await this.ensureFolder();
+
+      // Search for settings file
+      const searchRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+          `name='${this.settingsFileName}' and '${folderId}' in parents and trashed=false`
+        )}&fields=files(id)`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      const searchData = await searchRes.json();
+      const fileId = searchData.files?.[0]?.id;
+
+      if (!fileId) {
+        return null; // Settings file doesn't exist
+      }
+
+      // Load settings file content
+      const res = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      const settingsData: GroupsSettings = await res.json();
+      return settingsData.classes;
+    } catch (error) {
+      console.error('Failed to load groups settings:', error);
+      return null;
+    }
   }
 
   async deleteSlideshow(fileId: string): Promise<void> {

@@ -3,7 +3,7 @@ import { X, Plus, Trash2, GripVertical } from 'lucide-react';
 
 interface SettingsModalProps {
   classes: string[];
-  onUpdateClasses: (groups: string[]) => void;
+  onUpdateClasses: (groups: string[]) => Promise<void>;
   onClose: () => void;
 }
 
@@ -14,6 +14,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const [localGroups, setLocalGroups] = useState<string[]>([...classes]);
   const [newGroupName, setNewGroupName] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleAddGroup = () => {
     if (newGroupName.trim() && !localGroups.includes(newGroupName.trim())) {
@@ -32,8 +33,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     setLocalGroups(updated);
   };
 
-  const handleSave = () => {
-    onUpdateClasses(localGroups);
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await onUpdateClasses(localGroups);
+    } finally {
+      setIsSaving(false);
+    }
     onClose();
   };
 
@@ -121,15 +127,24 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="flex justify-end space-x-3 p-6 border-t bg-gray-50">
           <button
             onClick={onClose}
+            disabled={isSaving}
             className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg font-medium transition-colors duration-200"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors duration-200"
+            disabled={isSaving}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-lg font-medium transition-colors duration-200 flex items-center"
           >
-            Save Changes
+            {isSaving ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Saving...
+              </>
+            ) : (
+              'Save Changes'
+            )}
           </button>
         </div>
       </div>

@@ -12,6 +12,7 @@ import SettingsModal from './components/SettingsModal';
 import GoogleAuthButton from './components/GoogleAuthButton';
 import SlideshowManager from './components/SlideshowManager';
 import { googleAuthService, GoogleUser } from './services/googleAuth';
+import { googleDriveService } from './services/googleDrive';
 import { ClassData, MusicTrack, BackgroundImage, TransitionType } from './types';
 
 const TRANSITION_TYPES: TransitionType[] = [
@@ -50,6 +51,30 @@ function App() {
   const [selectedTransition, setSelectedTransition] = useState<TransitionType>(TRANSITION_TYPES[0]);
   const [currentUser, setCurrentUser] = useState<GoogleUser | null>(null);
   const [showSlideshowManager, setShowSlideshowManager] = useState(false);
+
+  // Load groups settings when user signs in
+  useEffect(() => {
+    const loadUserGroupsSettings = async () => {
+      if (currentUser && googleAuthService.isSignedIn()) {
+        try {
+          const savedClasses = await googleDriveService.loadGroupsSettings();
+          if (savedClasses && savedClasses.length > 0) {
+            setClasses(savedClasses);
+            // Initialize classData for new groups
+            const newClassData: ClassData = {};
+            savedClasses.forEach(className => {
+              newClassData[className] = classData[className] || [];
+            });
+            setClassData(newClassData);
+          }
+        } catch (error) {
+          console.error('Failed to load groups settings:', error);
+        }
+      }
+    };
+
+    loadUserGroupsSettings();
+  }, [currentUser]);
 
   // Initialize weekly music selection
   useEffect(() => {
@@ -183,7 +208,7 @@ const normalizeLoadedClassData = (loaded: any) => {
   return normalized;
 };
   
-  const handleClassesUpdate = (newClasses: string[]) => {
+  const handleClassesUpdate = async (newClasses: string[]) => {
     // Update class names and migrate existing photo data
     const newClassData: ClassData = {};   
     
@@ -197,6 +222,16 @@ const normalizeLoadedClassData = (loaded: any) => {
     
     setClasses(newClasses);
     setClassData(newClassData);
+
+    // Save groups settings to Google Drive if user is signed in
+    if (currentUser && googleAuthService.isSignedIn()) {
+      try {
+        await googleDriveService.saveGroupsSettings(newClasses);
+      } catch (error) {
+        console.error('Failed to save groups settings:', error);
+        // Don't show error to user as this is a background operation
+      }
+    }
   };
 
   const handleNext = () => {
