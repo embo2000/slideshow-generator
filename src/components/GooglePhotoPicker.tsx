@@ -18,6 +18,7 @@ export const GooglePhotoPicker: React.FC = () => {
         setSessionId(session.id);
       } catch (err) {
         console.error('Failed to start session', err);
+        
       } finally {
         setLoading(false);
       }
