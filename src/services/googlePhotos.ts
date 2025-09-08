@@ -23,45 +23,25 @@ export interface GooglePhotosAlbum {
 class GooglePhotosService {
   private async getToken(): Promise<string> {
     const token = googleAuthService.getAccessToken();
-    if (!token) {
-      throw new Error('Not signed in');
-    }
+    if (!token) throw new Error('Not signed in or token missing');
     return token;
   }
 
-  private async fetchWithTokenRetry(input: RequestInfo, init?: RequestInit): Promise<any> {
-    try {
-      const token = await this.getToken();
-      const headers = { ...init?.headers, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
-      const response = await fetch(input, { ...init, headers });
-
-      if (response.status === 403) {
-        // Token likely missing scopes; refresh
-        await googleAuthService.signIn();
-        const newToken = await this.getToken();
-        const retryHeaders = { ...init?.headers, Authorization: `Bearer ${newToken}`, 'Content-Type': 'application/json' };
-        const retryResponse = await fetch(input, { ...init, headers: retryHeaders });
-
-        if (!retryResponse.ok) {
-          const errText = await retryResponse.text();
-          throw new Error(`Failed after token refresh: ${retryResponse.status} ${errText}`);
-        }
-        return retryResponse.json();
-      }
-
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`Request failed: ${response.status} ${errText}`);
-      }
-
-      return response.json();
-    } catch (err) {
-      throw err;
-    }
-  }
-
   async getAlbums(): Promise<GooglePhotosAlbum[]> {
-    const data = await this.fetchWithTokenRetry('https://photoslibrary.googleapis.com/v1/albums?pageSize=50');
+    const token = await this.getToken();
+
+    const response = await fetch('https://photoslibrary.googleapis.com/v1/albums?pageSize=50', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch albums: ${response.status}`);
+    }
+
+    const data = await response.json();
     return data.albums || [];
   }
 
@@ -69,42 +49,34 @@ class GooglePhotosService {
     albumId: string,
     pageToken?: string
   ): Promise<{ photos: GooglePhoto[]; nextPageToken?: string }> {
+    const token = await this.getToken();
+
     const body: any = { albumId, pageSize: 50 };
     if (pageToken) body.pageToken = pageToken;
 
-    const data = await this.fetchWithTokenRetry('https://photoslibrary.googleapis.com/v1/mediaItems:search', {
+    const response = await fetch('https://photoslibrary.googleapis.com/v1/mediaItems:search', {
       method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify(body),
     });
 
-    return {
-      photos: data.mediaItems || [],
-      nextPageToken: data.nextPageToken,
-    };
-  }
+    if (!response.ok) {
+      throw new Error(`Failed to fetch photos: ${response.status}`);
+    }
 
-  async getAllPhotos(pageToken?: string): Promise<{ photos: GooglePhoto[]; nextPageToken?: string }> {
-    const url = new URL('https://photoslibrary.googleapis.com/v1/mediaItems');
-    url.searchParams.set('pageSize', '50');
-    if (pageToken) url.searchParams.set('pageToken', pageToken);
-
-    const data = await this.fetchWithTokenRetry(url.toString());
-    return {
-      photos: data.mediaItems || [],
-      nextPageToken: data.nextPageToken,
-    };
+    const data = await response.json();
+    return { photos: data.mediaItems || [], nextPageToken: data.nextPageToken };
   }
 
   async downloadPhoto(photo: GooglePhoto): Promise<File> {
-    // Use original dimensions
     const downloadUrl = `${photo.baseUrl}=w${photo.mediaMetadata.width}-h${photo.mediaMetadata.height}`;
-    const response = await fetch(downloadUrl);
+    const resp = await fetch(downloadUrl);
+    if (!resp.ok) throw new Error('Failed to download photo');
 
-    if (!response.ok) {
-      throw new Error(`Failed to download photo: ${response.status}`);
-    }
-
-    const blob = await response.blob();
+    const blob = await resp.blob();
     return new File([blob], photo.filename, { type: photo.mimeType });
   }
 }
