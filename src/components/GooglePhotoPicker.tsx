@@ -60,7 +60,8 @@ const GooglePhotoPicker: React.FC<GooglePhotoPickerProps> = ({
   };
 
   const togglePhotoSelection = (photo: GooglePhotoPickerResult) => {
-    if (selectedPhotos.find((p) => p.id === photo.id)) {
+    const exists = selectedPhotos.find((p) => p.id === photo.id);
+    if (exists) {
       setSelectedPhotos(selectedPhotos.filter((p) => p.id !== photo.id));
     } else if (selectedPhotos.length < maxPhotos) {
       setSelectedPhotos([...selectedPhotos, photo]);
@@ -97,7 +98,7 @@ const GooglePhotoPicker: React.FC<GooglePhotoPickerProps> = ({
           </button>
         </div>
 
-        <div className="p-6 flex flex-col items-center">
+        <div className="p-6 flex flex-col items-center flex-1 overflow-y-auto w-full">
           <button
             onClick={handleOpenPicker}
             disabled={isLoading}
@@ -107,31 +108,46 @@ const GooglePhotoPicker: React.FC<GooglePhotoPickerProps> = ({
           </button>
 
           {selectedPhotos.length > 0 && (
-            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 w-full">
-              {selectedPhotos.map((photo) => (
-                <div
-                  key={photo.id}
-                  className="relative aspect-square cursor-pointer rounded-lg overflow-hidden border-2 border-transparent hover:border-gray-300"
-                  onClick={() => togglePhotoSelection(photo)}
-                >
-                  <img src={photo.url} alt={photo.name} className="w-full h-full object-cover" />
-                  <div className="absolute top-2 right-2 bg-blue-500 text-white rounded-full p-1">
-                    <Check className="h-3 w-3" />
+            <>
+              <div className="text-sm text-gray-600 mb-2">
+                {selectedPhotos.length}/{maxPhotos} selected
+              </div>
+              <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 w-full">
+                {selectedPhotos.map((photo) => (
+                  <div
+                    key={photo.id}
+                    className={`relative aspect-square cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
+                      selectedPhotos.find((p) => p.id === photo.id)
+                        ? 'border-blue-500 ring-2 ring-blue-200'
+                        : 'border-transparent hover:border-gray-300'
+                    }`}
+                    onClick={() => togglePhotoSelection(photo)}
+                  >
+                    <img src={photo.url} alt={photo.name} className="w-full h-full object-cover" />
+                    {selectedPhotos.find((p) => p.id === photo.id) && (
+                      <div className="absolute top-2 right-2 bg-blue-500 text-white rounded-full p-1">
+                        <Check className="h-3 w-3" />
+                      </div>
+                    )}
+                    {selectedPhotos.length >= maxPhotos &&
+                      !selectedPhotos.find((p) => p.id === photo.id) && (
+                        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                          <span className="text-white text-xs font-medium">Max reached</span>
+                        </div>
+                      )}
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
 
-          {selectedPhotos.length > 0 && (
-            <button
-              onClick={handleConfirmSelection}
-              disabled={isLoading}
-              className="mt-6 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
-            >
-              <Download className="h-4 w-4 inline-block mr-2" />
-              Add Selected Photos
-            </button>
+              <button
+                onClick={handleConfirmSelection}
+                disabled={isLoading}
+                className="mt-6 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+              >
+                <Download className="h-4 w-4 inline-block mr-2" />
+                Add Selected Photos
+              </button>
+            </>
           )}
         </div>
       </div>
