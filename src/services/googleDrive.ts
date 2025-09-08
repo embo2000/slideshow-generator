@@ -194,8 +194,9 @@ class GoogleDriveService {
     console.log('Drive API response:', data);
     
     // Filter for JSON files (slideshow files)
-    const jsonFiles = (data.files ?? []).filter((file: DriveFile) => 
-      file.name.endsWith('.json')
+    const jsonFiles = (data.files ?? []).filter((file: DriveFile) => {
+      return file.name.endsWith('.json') && file.name !== this.settingsFileName;
+    }
     );
     
     console.log('Filtered JSON files:', jsonFiles);
