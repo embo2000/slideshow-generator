@@ -42,7 +42,7 @@ const WizardProgress: React.FC<WizardProgressProps> = ({
                 <div className="ml-3">
                   <div className={`text-xs font-medium ${
                     index <= currentStep ? 'text-gray-900' : 'text-gray-500'
-                  }`}>
+                  } whitespace-nowrap`}>
                     {title}
                   </div>
                 </div>
