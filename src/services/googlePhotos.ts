@@ -31,7 +31,7 @@ class GooglePhotosService {
   async openPicker(oauthToken: string, maxPhotos = 5): Promise<GooglePhotoPickerResult[]> {
     await this.loadPickerApi();
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const view = new (window as any).google.picker.DocsView()
         .setIncludeFolders(false)
         .setMimeTypes('image/png,image/jpeg,image/jpg')
@@ -40,7 +40,6 @@ class GooglePhotosService {
       const picker = new (window as any).google.picker.PickerBuilder()
         .addView(view)
         .setOAuthToken(oauthToken)
-        .setDeveloperKey('') // Optional, can leave blank if OAuth is used
         .setCallback((data: any) => {
           if (data.action === (window as any).google.picker.Action.PICKED) {
             const docs = data.docs || [];
@@ -51,7 +50,7 @@ class GooglePhotosService {
               mimeType: doc.mimeType,
             }));
             resolve(results);
-          } else if (data.action === (window as any).google.picker.Action.CANCEL) {
+          } else {
             resolve([]);
           }
         })
