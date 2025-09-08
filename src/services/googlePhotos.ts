@@ -1,150 +1,77 @@
-import { googleAuthService } from './googleAuth';
-
-export interface GooglePhoto {
-  id: string;
-  baseUrl: string;
-  filename: string;
-  mimeType: string;
-  mediaMetadata: {
-    width: string;
-    height: string;
-    creationTime: string;
-  };
+declare global {
+  interface Window {
+    gapi: any;
+    google: any;
+  }
 }
 
-export interface GooglePhotosAlbum {
-  id: string;
-  title: string;
-  productUrl: string;
-  mediaItemsCount: string;
-  coverPhotoBaseUrl?: string;
+export interface GooglePhoto {
+  url: string;
+  filename?: string;
 }
 
 class GooglePhotosService {
-  private async getToken(): Promise<string> {
-    const token = googleAuthService.getAccessToken();
-    if (!token) throw new Error('Not signed in');
-    return token;
-  }
+  private oauthToken: string | null = null;
 
-  async getAlbums(): Promise<GooglePhotosAlbum[]> {
-    const token = await this.getToken();
-    
-    const response = await fetch('https://photoslibrary.googleapis.com/v1/albums', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+  // Initialize the API and sign in the user
+  async init(developerKey: string, clientId: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      window.gapi.load('client:auth2', async () => {
+        try {
+          await window.gapi.client.init({
+            apiKey: developerKey,
+            clientId: clientId,
+            scope: 'https://www.googleapis.com/auth/photoslibrary.readonly',
+            discoveryDocs: ['https://photoslibrary.googleapis.com/$discovery/rest?version=v1'],
+          });
+
+          const authInstance = window.gapi.auth2.getAuthInstance();
+          if (!authInstance.isSignedIn.get()) {
+            const user = await authInstance.signIn();
+            this.oauthToken = user.getAuthResponse().access_token;
+          } else {
+            this.oauthToken = authInstance.currentUser.get().getAuthResponse().access_token;
+          }
+
+          resolve();
+        } catch (err) {
+          reject(err);
+        }
+      });
     });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch albums: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.albums || [];
   }
 
-  async getPhotosFromAlbum(albumId: string, pageToken?: string): Promise<{ photos: GooglePhoto[]; nextPageToken?: string }> {
-    const token = await this.getToken();
-    
-    const body = {
-      albumId,
-      pageSize: 50,
-      ...(pageToken && { pageToken }),
-    };
+  // Opens the Google Photos Picker UI
+  openPicker(
+    developerKey: string,
+    maxPhotos: number = 10
+  ): Promise<GooglePhoto[]> {
+    return new Promise((resolve, reject) => {
+      if (!this.oauthToken) {
+        return reject(new Error('User is not signed in'));
+      }
 
-    const response = await fetch('https://photoslibrary.googleapis.com/v1/mediaItems:search', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
+      const picker = new window.google.picker.PickerBuilder()
+        .addView(window.google.picker.ViewId.PHOTOS)
+        .setOAuthToken(this.oauthToken)
+        .setDeveloperKey(developerKey)
+        .setSelectableMimeTypes('image/png,image/jpeg')
+        .setMaxItems(maxPhotos)
+        .setCallback((data: any) => {
+          if (data.action === window.google.picker.Action.PICKED) {
+            const photos: GooglePhoto[] = data.docs.map((doc: any) => ({
+              url: doc.url,
+              filename: doc.name || undefined,
+            }));
+            resolve(photos);
+          } else if (data.action === window.google.picker.Action.CANCEL) {
+            resolve([]);
+          }
+        })
+        .build();
+
+      picker.setVisible(true);
     });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch photos: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return {
-      photos: data.mediaItems || [],
-      nextPageToken: data.nextPageToken,
-    };
-  }
-
-  async getAllPhotos(pageToken?: string): Promise<{ photos: GooglePhoto[]; nextPageToken?: string }> {
-    const token = await this.getToken();
-    
-    const url = new URL('https://photoslibrary.googleapis.com/v1/mediaItems');
-    url.searchParams.set('pageSize', '50');
-    if (pageToken) {
-      url.searchParams.set('pageToken', pageToken);
-    }
-
-    const response = await fetch(url.toString(), {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch photos: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return {
-      photos: data.mediaItems || [],
-      nextPageToken: data.nextPageToken,
-    };
-  }
-
-  async searchPhotos(query: string, pageToken?: string): Promise<{ photos: GooglePhoto[]; nextPageToken?: string }> {
-    const token = await this.getToken();
-    
-    const body = {
-      pageSize: 50,
-      filters: {
-        contentFilter: {
-          includedContentCategories: ['NONE'],
-        },
-      },
-      ...(pageToken && { pageToken }),
-    };
-
-    const response = await fetch('https://photoslibrary.googleapis.com/v1/mediaItems:search', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to search photos: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return {
-      photos: data.mediaItems || [],
-      nextPageToken: data.nextPageToken,
-    };
-  }
-
-  async downloadPhoto(photo: GooglePhoto): Promise<File> {
-    // Create a download URL with size parameters for better quality
-    const downloadUrl = `${photo.baseUrl}=w${photo.mediaMetadata.width}-h${photo.mediaMetadata.height}`;
-    
-    const response = await fetch(downloadUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to download photo: ${response.status}`);
-    }
-
-    const blob = await response.blob();
-    return new File([blob], photo.filename, { type: photo.mimeType });
   }
 }
 
