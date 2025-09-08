@@ -65,3 +65,5 @@ export const GooglePhotoPicker = ({
     </div>
   );
 };
+
+export default GooglePhotoPicker;
