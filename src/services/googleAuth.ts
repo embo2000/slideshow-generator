@@ -54,46 +54,53 @@ class GoogleAuthService {
     });
   }
 
-  async signIn(): Promise<GoogleUser> {
-    if (!this.isInitialized || !this.tokenClient) {
-      throw new Error('Google Auth service not initialized. Please wait for initialization to complete.');
-    }
-
-    return new Promise((resolve, reject) => {
-      this.tokenClient.callback = async (response: GoogleAuthResponse) => {
-        if ((response as any).error) {
-          reject(response);
-          return;
-        }
-
-        const accessToken = response.access_token;
-
-        try {
-          // Call Google UserInfo endpoint directly
-          const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-            headers: { Authorization: `Bearer ${accessToken}` },
-          });
-          const userData = await userResponse.json();
-
-          const user: GoogleUser = {
-            id: userData.id,
-            name: userData.name,
-            email: userData.email,
-            picture: userData.picture,
-          };
-
-          localStorage.setItem('google_access_token', accessToken);
-          localStorage.setItem('google_user', JSON.stringify(user));
-
-          resolve(user);
-        } catch (err) {
-          reject(err);
-        }
-      };
-
-      this.tokenClient.requestAccessToken({ prompt: 'consent' });
-    });
+async signIn(): Promise<GoogleUser> {
+  if (!this.isInitialized || !this.tokenClient) {
+    throw new Error('Google Auth service not initialized.');
   }
+
+  // Revoke any old token
+  const oldToken = localStorage.getItem('google_access_token');
+  if (oldToken) {
+    (window as any).google.accounts.oauth2.revoke(oldToken);
+  }
+
+  return new Promise((resolve, reject) => {
+    this.tokenClient.callback = async (response: GoogleAuthResponse) => {
+      if ((response as any).error) {
+        reject(response);
+        return;
+      }
+
+      const accessToken = response.access_token;
+
+      try {
+        const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        const userData = await userResponse.json();
+
+        const user: GoogleUser = {
+          id: userData.id,
+          name: userData.name,
+          email: userData.email,
+          picture: userData.picture,
+        };
+
+        localStorage.setItem('google_access_token', accessToken);
+        localStorage.setItem('google_user', JSON.stringify(user));
+
+        resolve(user);
+      } catch (err) {
+        reject(err);
+      }
+    };
+
+    // Force consent so Google returns all requested scopes
+    this.tokenClient.requestAccessToken({ prompt: 'consent' });
+  });
+}
+
 
   async signOut(): Promise<void> {
     const token = localStorage.getItem('google_access_token');
