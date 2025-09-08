@@ -18,7 +18,7 @@ To enable Google Drive integration for saving and loading slideshows:
 
 1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project or select an existing one
-3. Enable the Google Drive API, Google+ API, and Google Photos Library API
+3. Enable the Google Drive API and Google+ API
 4. Create credentials (OAuth 2.0 Client ID)
 5. Add your domain to authorized origins
 6. Copy the Client ID and API Key to your `.env` file
@@ -32,20 +32,6 @@ VITE_GOOGLE_CLIENT_ID=your_google_client_id_here
 VITE_GOOGLE_API_KEY=your_google_api_key_here
 ```
 
-### Required Google APIs
-
-Make sure to enable these APIs in your Google Cloud Console:
-- **Google Drive API**: For saving/loading slideshows
-- **Google+ API**: For user authentication (legacy, but still required)
-- **Google Photos Library API**: For accessing user's Google Photos
-
-### OAuth 2.0 Scopes
-
-The application requests these scopes:
-- `https://www.googleapis.com/auth/drive`: Access to Google Drive
-- `https://www.googleapis.com/auth/userinfo.profile`: User profile information
-- `https://www.googleapis.com/auth/userinfo.email`: User email
-- `https://www.googleapis.com/auth/photoslibrary.readonly`: Read-only access to Google Photos
 ## Getting Started
 
 1. Install dependencies:

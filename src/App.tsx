@@ -14,8 +14,6 @@ import SlideshowManager from './components/SlideshowManager';
 import { googleAuthService, GoogleUser } from './services/googleAuth';
 import { googleDriveService } from './services/googleDrive';
 import { ClassData, MusicTrack, BackgroundImage, TransitionType } from './types';
-import GooglePhotoPicker from './components/GooglePhotoPicker';
-
 
 const TRANSITION_TYPES: TransitionType[] = [
   { id: 'fade', name: 'Fade', description: 'Smooth fade between images' },
@@ -236,13 +234,6 @@ const normalizeLoadedClassData = (loaded: any) => {
     }
   };
 
-  const handleGooglePhotosSelect = (items: any[]) => {
-    // Example: put all photos into first class
-    updateClassPhotos(classes[0], items.map(item => ({ url: item.baseUrl })));
-  };
-
-
-  
   const handleNext = () => {
     if (currentStep < totalSteps - 1) {
       setCurrentStep(currentStep + 1);
@@ -353,10 +344,6 @@ const normalizeLoadedClassData = (loaded: any) => {
                 </button>
               )}
               <GoogleAuthButton onAuthChange={setCurrentUser} />
-              <GooglePhotoPicker
-  clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}
-  onSelect={handleGooglePhotosSelect}
-/>
             </div>
           </div>
         </div>
