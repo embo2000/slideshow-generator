@@ -58,5 +58,6 @@ async openPicker(accessToken: string, maxPhotos: number): Promise<GooglePhotoPic
   });
 }
 
+}
 
 export const googlePhotosService = new GooglePhotosService();
