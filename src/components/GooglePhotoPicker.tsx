@@ -1,156 +1,109 @@
-import React, { useState, useEffect } from 'react';
-import { X, Image as ImageIcon, Check, Download } from 'lucide-react';
-import { googlePhotosService, GooglePhotoPickerResult } from '../services/googlePhotos';
-import { googleAuthService } from '../services/googleAuth';
+// src/components/GooglePhotoPicker.tsx
+import React, { useEffect, useState } from 'react';
+import { googlePhotosService, GooglePhoto } from '../services/googlePhotos';
 
-interface GooglePhotoPickerProps {
-  onPhotosSelected: (photos: GooglePhotoPickerResult[]) => void;
-  onClose: () => void;
-  maxPhotos?: number;
-}
+export const GooglePhotoPicker: React.FC = () => {
+  const [loading, setLoading] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [mediaItems, setMediaItems] = useState<GooglePhoto[]>([]);
+  const [selectedItem, setSelectedItem] = useState<GooglePhoto | null>(null);
+  const [nextPageToken, setNextPageToken] = useState<string | null>(null);
 
-const GooglePhotoPicker: React.FC<GooglePhotoPickerProps> = ({
-  onPhotosSelected,
-  onClose,
-  maxPhotos = 5,
-}) => {
-  const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set());
-  const [photos, setPhotos] = useState<GooglePhotoPickerResult[]>([]);
-  const [isPicking, setIsPicking] = useState(false);
-
+  // Start a picker session on mount
   useEffect(() => {
-    // Load Google Picker API script
-    googlePhotosService.loadPickerScript().catch(console.error);
+    const startPicker = async () => {
+      setLoading(true);
+      try {
+        const session = await googlePhotosService.createSession();
+        setSessionId(session.id);
+      } catch (err) {
+        console.error('Failed to start session', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    startPicker();
   }, []);
 
-  const handleOpenPicker = async () => {
-    const token = googleAuthService.getAccessToken();
-    if (!token) {
-      alert('Please sign in with Google first.');
-      return;
-    }
+  // Poll for session completion
+  useEffect(() => {
+    if (!sessionId) return;
+    const interval = setInterval(async () => {
+      try {
+        const session = await googlePhotosService.getSession();
+        if (session.mediaItemsSet) {
+          clearInterval(interval);
+          loadImages();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [sessionId]);
 
-    setIsPicking(true);
+  const loadImages = async (pageToken?: string) => {
     try {
-      const picked = await googlePhotosService.openPicker(token, maxPhotos);
-      setPhotos(picked);
-      setSelectedPhotos(new Set(picked.map(p => p.id)));
+      const { mediaItems: items, nextPageToken } = await googlePhotosService.fetchImages(pageToken);
+      setMediaItems(items);
+      setNextPageToken(nextPageToken || null);
     } catch (err) {
-      console.error('Failed to open Google Photos Picker:', err);
-      alert('Failed to open Google Photos Picker. Please try again.');
-    } finally {
-      setIsPicking(false);
+      console.error('Failed to load images', err);
     }
   };
-
-  const togglePhotoSelection = (photoId: string) => {
-    const newSelected = new Set(selectedPhotos);
-    if (newSelected.has(photoId)) {
-      newSelected.delete(photoId);
-    } else if (newSelected.size < maxPhotos) {
-      newSelected.add(photoId);
-    }
-    setSelectedPhotos(newSelected);
-  };
-
-  const handleConfirmSelection = () => {
-    const selected = photos.filter(p => selectedPhotos.has(p.id));
-    if (selected.length === 0) {
-      alert('Please select at least one photo.');
-      return;
-    }
-    onPhotosSelected(selected);
-    onClose();
-  };
-
-  if (!googleAuthService.isSignedIn()) {
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 text-center">
-          <ImageIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Sign In Required</h2>
-          <p className="text-gray-600 mb-4">
-            Please sign in with your Google account to access Google Photos.
-          </p>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl font-bold text-gray-900">Select from Google Photos</h2>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <X className="h-5 w-5 text-gray-500" />
-          </button>
-        </div>
+    <div className="photo-picker">
+      {loading && <p>Loading Google Photos Picker...</p>}
 
-        <div className="flex-1 overflow-y-auto p-6">
-          <button
-            onClick={handleOpenPicker}
-            disabled={isPicking}
-            className="w-full p-4 border-2 border-dashed border-blue-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors text-center mb-6"
-          >
-            <ImageIcon className="h-8 w-8 text-blue-500 mx-auto mb-2" />
-            <span className="text-blue-700 font-medium">
-              {isPicking ? 'Opening Picker...' : 'Browse Google Photos'}
-            </span>
-          </button>
-
-          {photos.length > 0 && (
-            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {photos.map(photo => (
-                <div
-                  key={photo.id}
-                  onClick={() => togglePhotoSelection(photo.id)}
-                  className={`relative aspect-square cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
-                    selectedPhotos.has(photo.id)
-                      ? 'border-blue-500 ring-2 ring-blue-200'
-                      : 'border-transparent hover:border-gray-300'
-                  }`}
-                >
-                  <img src={photo.url} alt={photo.name} className="w-full h-full object-cover" />
-                  {selectedPhotos.has(photo.id) && (
-                    <div className="absolute top-2 right-2 bg-blue-500 text-white rounded-full p-1">
-                      <Check className="h-3 w-3" />
-                    </div>
-                  )}
-                  {selectedPhotos.size >= maxPhotos && !selectedPhotos.has(photo.id) && (
-                    <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                      <span className="text-white text-xs font-medium">Max reached</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {photos.length > 0 && (
-          <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
-            <span className="text-sm text-gray-600">
-              {selectedPhotos.size} photo{selectedPhotos.size !== 1 ? 's' : ''} selected
-            </span>
-            <button
-              onClick={handleConfirmSelection}
-              className="inline-flex items-center px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Add Selected Photos
-            </button>
-          </div>
-        )}
+      <div className="grid grid-cols-4 gap-4 p-4">
+        {mediaItems.map((item) => (
+          <img
+            key={item.id}
+            src={`${item.baseUrl}=w128-h128`}
+            alt={item.name}
+            className="cursor-pointer rounded-md"
+            onClick={() => setSelectedItem(item)}
+          />
+        ))}
       </div>
+
+      {nextPageToken && (
+        <button onClick={() => loadImages(nextPageToken)} className="btn mt-4">
+          Next Page
+        </button>
+      )}
+
+      {/* Modal */}
+      {selectedItem && (
+        <div className="modal fixed inset-0 bg-gray-50 bg-opacity-75 flex items-center justify-center z-50">
+          <div className="bg-white border p-4 rounded-lg relative max-w-2xl w-full">
+            <button
+              className="absolute top-2 right-2 text-red-500 font-bold"
+              onClick={() => setSelectedItem(null)}
+            >
+              Close
+            </button>
+            {selectedItem.type === 'VIDEO' ? (
+              <video src={`${selectedItem.baseUrl}=dv`} controls className="max-w-full" />
+            ) : (
+              <img src={selectedItem.baseUrl} alt={selectedItem.name} className="max-w-full" />
+            )}
+
+            <table className="mt-4 w-full border">
+              <tbody>
+                {selectedItem.metadata &&
+                  Object.entries(selectedItem.metadata).map(([key, value]) => (
+                    <tr key={key}>
+                      <td className="border p-1 font-bold">{key}</td>
+                      <td className="border p-1">{JSON.stringify(value)}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
-
-export default GooglePhotoPicker;
