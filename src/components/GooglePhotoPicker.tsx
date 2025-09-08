@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { X, Image as ImageIcon, Check, Download } from 'lucide-react';
+import { X, Image as ImageIcon } from 'lucide-react';
 import { googleAuthService } from '../services/googleAuth';
 
 interface GooglePhotoPickerProps {
@@ -44,18 +44,33 @@ const GooglePhotoPicker: React.FC<GooglePhotoPickerProps> = ({
 
       const picker = new window.google.picker.PickerBuilder()
         .setOAuthToken(accessToken)
-        .setDeveloperKey('') // optional if OAuth token is used
         .addView(window.google.picker.ViewId.PHOTOS)
         .setSelectableMimeTypes('image/jpeg,image/png')
         .setMaxItems(maxPhotos)
-        .setCallback((data: any) => {
+        .setCallback(async (data: any) => {
           if (data.action === window.google.picker.Action.PICKED) {
             const docs = data.docs || [];
-            const files: File[] = docs.map((doc: any) => {
-              return new File([], doc.name); // Placeholder File objects; Picker only returns metadata
-            });
-            onPhotosSelected(files);
-            onClose();
+            try {
+              const files: File[] = await Promise.all(
+                docs.map(async (doc: any) => {
+                  const url = doc.url || doc.baseUrl || doc.originalUrl;
+                  const response = await fetch(url, {
+                    headers: {
+                      Authorization: `Bearer ${accessToken}`,
+                    },
+                  });
+                  if (!response.ok) throw new Error(`Failed to fetch image: ${doc.name}`);
+                  const blob = await response.blob();
+                  return new File([blob], doc.name, { type: blob.type });
+                })
+              );
+
+              onPhotosSelected(files);
+              onClose();
+            } catch (err) {
+              console.error('Failed to download selected images:', err);
+              alert('Failed to download selected images. Please try again.');
+            }
           } else if (data.action === window.google.picker.Action.CANCEL) {
             onClose();
           }
