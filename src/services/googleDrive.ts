@@ -167,17 +167,33 @@ class GoogleDriveService {
     const token = await this.getToken();
     const folderId = await this.ensureFolder();
 
+    // Add a small delay to ensure Google Drive indexing is complete
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     const res = await fetch(
       `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
-        `'${folderId}' in parents and name contains '.json' and trashed=false`
-      )}&fields=files(id,name,createdTime,modifiedTime,size)&orderBy=modifiedTime desc`,
+        `'${folderId}' in parents and trashed=false`
+      )}&fields=files(id,name,createdTime,modifiedTime,size)&orderBy=modifiedTime desc&pageSize=100`,
       {
         headers: { Authorization: `Bearer ${token}` },
       }
     );
 
+    if (!res.ok) {
+      console.error('Failed to list files:', await res.text());
+      throw new Error(`Failed to list files: ${res.status}`);
+    }
+
     const data = await res.json();
-    return data.files ?? [];
+    console.log('Drive API response:', data);
+    
+    // Filter for JSON files (slideshow files)
+    const jsonFiles = (data.files ?? []).filter((file: DriveFile) => 
+      file.name.endsWith('.json')
+    );
+    
+    console.log('Filtered JSON files:', jsonFiles);
+    return jsonFiles;
   }
 
   async deleteSlideshow(fileId: string): Promise<void> {

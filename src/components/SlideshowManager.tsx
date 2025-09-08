@@ -39,6 +39,13 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
     }
   }, []);
 
+  useEffect(() => {
+    // Reload slideshows when switching to load tab
+    if (activeTab === 'load' && googleAuthService.isSignedIn()) {
+      loadSlideshows();
+    }
+  }, [activeTab]);
+
   const loadSlideshows = async () => {
     setIsLoading(true);
     try {
@@ -72,7 +79,10 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
       alert('Slideshow saved successfully!');
       setSlideshowName('');
       await loadSlideshows();
-      setActiveTab('load');
+      // Add a small delay before switching tabs to ensure the file appears
+      setTimeout(() => {
+        setActiveTab('load');
+      }, 500);
     } catch (error) {
       console.error('Failed to save slideshow:', error);
       alert('Failed to save slideshow. Please try again.');
