@@ -17,8 +17,7 @@ export const GooglePhotoPicker: React.FC = () => {
         const session = await googlePhotosService.createSession();
         setSessionId(session.id);
       } catch (err) {
-        console.error('Failed to start session', err);
-        
+        console.error('Failed to start session', err);    
       } finally {
         setLoading(false);
       }
