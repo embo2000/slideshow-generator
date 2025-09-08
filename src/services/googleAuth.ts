@@ -15,7 +15,7 @@ interface GoogleAuthResponse {
 class GoogleAuthService {
   private clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   private scopes =
-    'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
+    'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
 
   private tokenClient: any = null;
   private isInitialized = false;
@@ -69,7 +69,7 @@ class GoogleAuthService {
         const accessToken = response.access_token;
 
         try {
-          // ✅ Call Google UserInfo endpoint directly
+          // Call Google UserInfo endpoint directly
           const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
             headers: { Authorization: `Bearer ${accessToken}` },
           });
