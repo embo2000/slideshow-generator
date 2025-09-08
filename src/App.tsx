@@ -144,12 +144,13 @@ const handleLoadSlideshow = (data: {
   const slideshowClasses = Array.isArray(data.classes) ? data.classes : DEFAULT_CLASSES;
 
   // Normalize classData
-  const normalizedClassData: ClassData = {};
+  const normalizedClassData = normalizeLoadedClassData(data.classData);
   slideshowClasses.forEach(className => {
     const photos = data.classData?.[className];
     normalizedClassData[className] = Array.isArray(photos) ? photos : [];
   });
 
+  
   setClassData(normalizedClassData);
   setSelectedMusic(data.selectedMusic ?? null);
   setBackgroundImage(data.backgroundImage ?? null);
@@ -159,9 +160,23 @@ const handleLoadSlideshow = (data: {
 };
 
 
+const normalizeLoadedClassData = (loaded: any) => {
+  const normalized: ClassData = {};
+  Object.entries(loaded || {}).forEach(([className, images]) => {
+    // Make sure it's always an array
+    normalized[className] = Array.isArray(images)
+      ? images.map((img: string | File) => {
+          // If it's a Base64 string, wrap in an object with url property
+          return typeof img === 'string' ? { url: `data:image/jpeg;base64,${img}` } : img;
+        })
+      : [];
+  });
+  return normalized;
+};
+  
   const handleClassesUpdate = (newClasses: string[]) => {
     // Update class names and migrate existing photo data
-    const newClassData: ClassData = {};
+    const newClassData: ClassData = {};   
     
     newClasses.forEach((newClassName, index) => {
       const oldClassName = classes[index];
