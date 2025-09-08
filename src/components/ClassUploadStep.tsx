@@ -1,6 +1,7 @@
 import React, { useRef, useState, useCallback } from 'react';
-import { Upload, X, Image as ImageIcon, CheckCircle } from 'lucide-react';
+import { Upload, X, Image as ImageIcon, CheckCircle, Camera } from 'lucide-react';
 import WizardStepWrapper from './WizardStepWrapper';
+import GooglePhotoPicker from './GooglePhotoPicker';
 
 interface ClassUploadStepProps {
   className: string;
@@ -19,6 +20,7 @@ const ClassUploadStep: React.FC<ClassUploadStepProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [showGooglePhotoPicker, setShowGooglePhotoPicker] = useState(false);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -45,6 +47,12 @@ const ClassUploadStep: React.FC<ClassUploadStepProps> = ({
   const removePhoto = (index: number) => {
     const newPhotos = photos.filter((_, i) => i !== index);
     onPhotosUpdate(newPhotos);
+  };
+
+  const handleGooglePhotosSelected = (googlePhotos: File[]) => {
+    const newPhotos = [...photos, ...googlePhotos].slice(0, 5);
+    onPhotosUpdate(newPhotos);
+    setShowGooglePhotoPicker(false);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -113,13 +121,28 @@ const ClassUploadStep: React.FC<ClassUploadStepProps> = ({
           <div className="flex flex-col items-center space-y-4">
             <Upload className={`h-12 w-12 ${dragOver ? 'text-blue-500' : 'text-gray-400'}`} />
             <div>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="text-lg font-medium text-blue-600 hover:text-blue-700 transition-colors"
-                disabled={photos.length >= 5}
-              >
-                {photos.length >= 5 ? 'Maximum photos reached' : 'Click to upload photos'}
-              </button>
+              <div className="flex flex-col sm:flex-row gap-3 items-center">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-lg font-medium text-blue-600 hover:text-blue-700 transition-colors disabled:text-gray-400"
+                  disabled={photos.length >= 5}
+                >
+                  {photos.length >= 5 ? 'Maximum photos reached' : 'Click to upload photos'}
+                </button>
+                
+                {photos.length < 5 && (
+                  <>
+                    <span className="text-gray-400 text-sm">or</span>
+                    <button
+                      onClick={() => setShowGooglePhotoPicker(true)}
+                      className="inline-flex items-center text-lg font-medium text-green-600 hover:text-green-700 transition-colors"
+                    >
+                      <Camera className="h-5 w-5 mr-2" />
+                      Select from Google Photos
+                    </button>
+                  </>
+                )}
+              </div>
               <p className="text-gray-500 mt-2">
                 or drag and drop images here
               </p>
@@ -140,6 +163,14 @@ const ClassUploadStep: React.FC<ClassUploadStepProps> = ({
           </div>
         )}
       </div>
+      
+      {showGooglePhotoPicker && (
+        <GooglePhotoPicker
+          onPhotosSelected={handleGooglePhotosSelected}
+          onClose={() => setShowGooglePhotoPicker(false)}
+          maxPhotos={5 - photos.length}
+        />
+      )}
     </WizardStepWrapper>
   );
 };
