@@ -1,165 +1,111 @@
-import { googleAuthService } from './googleAuth';
-
-export interface GooglePhoto {
+interface GooglePickerPhoto {
   id: string;
-  baseUrl: string;
-  filename: string;
+  name: string;
+  url: string;
+  thumbnailUrl: string;
   mimeType: string;
-  mediaMetadata: {
-    width: string;
-    height: string;
-    creationTime: string;
-  };
 }
 
-export interface GoogleAlbum {
-  id: string;
-  title: string;
-  productUrl: string;
-  mediaItemsCount: string;
-  coverPhotoBaseUrl?: string;
-  coverPhotoMediaItemId?: string;
-}
+class GooglePhotosPickerService {
+  private pickerApiLoaded = false;
+  private oauthToken: string | null = null;
 
-class GooglePhotosService {
-  private async getToken(): Promise<string> {
-    const token = googleAuthService.getAccessToken();
-    if (!token) throw new Error('Not signed in');
-    return token;
-  }
+  async initialize(): Promise<void> {
+    if (this.pickerApiLoaded) return;
 
-  async getAlbums(): Promise<GoogleAlbum[]> {
-    const token = await this.getToken();
-    
-    const response = await fetch('https://photoslibrary.googleapis.com/v1/albums', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Google Picker API failed to load within 10 seconds'));
+      }, 10000);
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch albums: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.albums || [];
-  }
-
-  async getPhotos(albumId?: string, pageToken?: string): Promise<{
-    photos: GooglePhoto[];
-    nextPageToken?: string;
-  }> {
-    const token = await this.getToken();
-    
-    let url = 'https://photoslibrary.googleapis.com/v1/mediaItems';
-    const params = new URLSearchParams();
-    
-    if (pageToken) {
-      params.append('pageToken', pageToken);
-    }
-    
-    params.append('pageSize', '50');
-    
-    if (albumId) {
-      // For album-specific photos, we need to use the search endpoint
-      url = 'https://photoslibrary.googleapis.com/v1/mediaItems:search';
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          albumId,
-          pageSize: 50,
-          pageToken,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch album photos: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return {
-        photos: data.mediaItems || [],
-        nextPageToken: data.nextPageToken,
-      };
-    } else {
-      // For all photos
-      if (params.toString()) {
-        url += `?${params.toString()}`;
-      }
-      
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch photos: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return {
-        photos: data.mediaItems || [],
-        nextPageToken: data.nextPageToken,
-      };
-    }
-  }
-
-  async searchPhotos(query: string): Promise<GooglePhoto[]> {
-    const token = await this.getToken();
-    
-    const response = await fetch('https://photoslibrary.googleapis.com/v1/mediaItems:search', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        filters: {
-          contentFilter: {
-            includedContentCategories: ['NONE']
+      // Load Google Picker API
+      const script = document.createElement('script');
+      script.src = 'https://apis.google.com/js/api.js';
+      script.onload = () => {
+        (window as any).gapi.load('picker', {
+          callback: () => {
+            this.pickerApiLoaded = true;
+            clearTimeout(timeout);
+            resolve();
+          },
+          onerror: () => {
+            clearTimeout(timeout);
+            reject(new Error('Failed to load Google Picker API'));
           }
-        },
-        pageSize: 50,
-      }),
+        });
+      };
+      script.onerror = () => {
+        clearTimeout(timeout);
+        reject(new Error('Failed to load Google API script'));
+      };
+      document.head.appendChild(script);
     });
-
-    if (!response.ok) {
-      throw new Error(`Failed to search photos: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const allPhotos = data.mediaItems || [];
-    
-    // Filter by filename on client side since API doesn't support filename search
-    return allPhotos.filter((photo: GooglePhoto) => 
-      photo.filename.toLowerCase().includes(query.toLowerCase())
-    );
   }
 
-  async downloadPhoto(photo: GooglePhoto): Promise<File> {
-    // Add download parameters to get full resolution
-    const downloadUrl = `${photo.baseUrl}=d`;
-    
-    const response = await fetch(downloadUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to download photo: ${response.status}`);
+  async openPhotoPicker(): Promise<File[]> {
+    if (!this.pickerApiLoaded) {
+      await this.initialize();
     }
 
-    const blob = await response.blob();
-    return new File([blob], photo.filename, { type: photo.mimeType });
+    // Get OAuth token
+    const token = localStorage.getItem('google_access_token');
+    if (!token) {
+      throw new Error('Not signed in to Google');
+    }
+
+    return new Promise((resolve, reject) => {
+      const picker = new (window as any).google.picker.PickerBuilder()
+        .enableFeature((window as any).google.picker.Feature.MULTISELECT_ENABLED)
+        .setOAuthToken(token)
+        .addView((window as any).google.picker.ViewId.PHOTOS)
+        .addView(new (window as any).google.picker.PhotosView()
+          .setType((window as any).google.picker.PhotosView.Type.UPLOADED))
+        .setCallback(async (data: any) => {
+          if (data.action === (window as any).google.picker.Action.PICKED) {
+            try {
+              const files = await this.downloadSelectedPhotos(data.docs);
+              resolve(files);
+            } catch (error) {
+              reject(error);
+            }
+          } else if (data.action === (window as any).google.picker.Action.CANCEL) {
+            resolve([]);
+          }
+        })
+        .build();
+
+      picker.setVisible(true);
+    });
   }
 
-  getThumbnailUrl(photo: GooglePhoto, size: number = 200): string {
-    return `${photo.baseUrl}=w${size}-h${size}-c`;
+  private async downloadSelectedPhotos(docs: any[]): Promise<File[]> {
+    const files: File[] = [];
+    
+    for (const doc of docs) {
+      try {
+        // Get the download URL for the photo
+        const downloadUrl = doc.url;
+        
+        // Fetch the image
+        const response = await fetch(downloadUrl);
+        if (!response.ok) {
+          console.warn(`Failed to download photo: ${doc.name}`);
+          continue;
+        }
+
+        const blob = await response.blob();
+        const file = new File([blob], doc.name || 'photo.jpg', { 
+          type: doc.mimeType || 'image/jpeg' 
+        });
+        
+        files.push(file);
+      } catch (error) {
+        console.warn(`Error downloading photo ${doc.name}:`, error);
+      }
+    }
+
+    return files;
   }
 }
 
-export const googlePhotosService = new GooglePhotosService();
+export const googlePhotosPickerService = new GooglePhotosPickerService();

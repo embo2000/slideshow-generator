@@ -139,7 +139,7 @@ const ClassUploadStep: React.FC<ClassUploadStepProps> = ({
                       className="inline-flex items-center text-sm font-medium text-green-600 hover:text-green-700 transition-colors"
                     >
                       <Camera className="h-4 w-4 mr-1" />
-                      Select from Google Photos
+                      Google Photos
                     </button>
                   </>
                 )}
