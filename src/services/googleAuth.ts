@@ -14,8 +14,12 @@ interface GoogleAuthResponse {
 
 class GoogleAuthService {
   private clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-  private scopes =
-    'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/photoslibrary.readonly';
+  private requiredScopes = [
+    'https://www.googleapis.com/auth/drive',
+    'https://www.googleapis.com/auth/userinfo.profile',
+    'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/photoslibrary.readonly',
+  ].join(' ');
 
   private tokenClient: any = null;
   private isInitialized = false;
@@ -39,8 +43,8 @@ class GoogleAuthService {
       gsiScript.onload = () => {
         this.tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
           client_id: this.clientId,
-          scope: this.scopes,
-          callback: () => {}, // will be set per request
+          scope: this.requiredScopes,
+          callback: () => {}, // dynamically set per request
         });
         this.isInitialized = true;
         clearTimeout(timeout);
@@ -54,61 +58,68 @@ class GoogleAuthService {
     });
   }
 
-async signIn(): Promise<GoogleUser> {
-  if (!this.isInitialized || !this.tokenClient) {
-    throw new Error('Google Auth service not initialized.');
+  private hasRequiredScopes(tokenScopes: string): boolean {
+    const tokenScopeSet = new Set(tokenScopes.split(' '));
+    return this.requiredScopes.split(' ').every(scope => tokenScopeSet.has(scope));
   }
 
-  // Revoke any old token
-  const oldToken = localStorage.getItem('google_access_token');
-  if (oldToken) {
-    (window as any).google.accounts.oauth2.revoke(oldToken);
+  async signIn(): Promise<GoogleUser> {
+    if (!this.isInitialized || !this.tokenClient) {
+      throw new Error('Google Auth service not initialized. Please wait for initialization.');
+    }
+
+    const storedToken = localStorage.getItem('google_access_token');
+    const storedScopes = localStorage.getItem('google_token_scopes');
+
+    // If token exists and has required scopes, skip consent
+    if (storedToken && storedScopes && this.hasRequiredScopes(storedScopes)) {
+      const userData = localStorage.getItem('google_user');
+      if (userData) return JSON.parse(userData);
+    }
+
+    return new Promise((resolve, reject) => {
+      this.tokenClient.callback = async (response: GoogleAuthResponse) => {
+        if ((response as any).error) {
+          reject(response);
+          return;
+        }
+
+        const accessToken = response.access_token;
+
+        try {
+          const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          const userData = await userRes.json();
+
+          const user: GoogleUser = {
+            id: userData.id,
+            name: userData.name,
+            email: userData.email,
+            picture: userData.picture,
+          };
+
+          localStorage.setItem('google_access_token', accessToken);
+          localStorage.setItem('google_user', JSON.stringify(user));
+          localStorage.setItem('google_token_scopes', response.scope);
+
+          resolve(user);
+        } catch (err) {
+          reject(err);
+        }
+      };
+
+      // Force consent if token missing or scopes insufficient
+      this.tokenClient.requestAccessToken({ prompt: 'consent' });
+    });
   }
-
-  return new Promise((resolve, reject) => {
-    this.tokenClient.callback = async (response: GoogleAuthResponse) => {
-      if ((response as any).error) {
-        reject(response);
-        return;
-      }
-
-      const accessToken = response.access_token;
-
-      try {
-        const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
-        const userData = await userResponse.json();
-
-        const user: GoogleUser = {
-          id: userData.id,
-          name: userData.name,
-          email: userData.email,
-          picture: userData.picture,
-        };
-
-        localStorage.setItem('google_access_token', accessToken);
-        localStorage.setItem('google_user', JSON.stringify(user));
-
-        resolve(user);
-      } catch (err) {
-        reject(err);
-      }
-    };
-
-    // Force consent so Google returns all requested scopes
-    this.tokenClient.requestAccessToken({ prompt: 'consent' });
-  });
-}
-
 
   async signOut(): Promise<void> {
     const token = localStorage.getItem('google_access_token');
-    if (token) {
-      (window as any).google.accounts.oauth2.revoke(token);
-    }
+    if (token) (window as any).google.accounts.oauth2.revoke(token);
     localStorage.removeItem('google_access_token');
     localStorage.removeItem('google_user');
+    localStorage.removeItem('google_token_scopes');
   }
 
   getCurrentUser(): GoogleUser | null {
