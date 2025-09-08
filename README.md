@@ -29,9 +29,11 @@ To enable Google Photos Picker integration:
 
 1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
 2. In your existing project, enable these APIs:
+   - Google Photos Library API (for picker access)
    - **Google Picker API**
    - **Google Drive API** (required for Picker to work)
 3. In your OAuth 2.0 Client ID configuration:
+   - Create **API Key** (restrict to your APIs for security)
    - Add your domain to **Authorized JavaScript origins**
    - Make sure both `http://localhost:5173` and your production domain are listed
 4. The Google Photos Picker will use Google's native picker interface
@@ -42,6 +44,7 @@ Create a `.env` file in the root directory:
 
 ```env
 VITE_GOOGLE_CLIENT_ID=your_google_client_id_here
+VITE_GOOGLE_API_KEY=your_google_api_key_here
 VITE_GOOGLE_API_KEY=your_google_api_key_here
 ```
 

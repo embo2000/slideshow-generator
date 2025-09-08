@@ -9,6 +9,7 @@ interface GooglePickerPhoto {
 class GooglePhotosPickerService {
   private pickerApiLoaded = false;
   private gapi: any = null;
+  private apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
 
   async initialize(): Promise<void> {
     if (this.pickerApiLoaded) return;
@@ -22,9 +23,10 @@ class GooglePhotosPickerService {
       const script = document.createElement('script');
       script.src = 'https://apis.google.com/js/api.js';
       script.onload = () => {
-        (window as any).gapi.load('auth2:picker', {
-          callback: () => {
+        (window as any).gapi.load('client:picker', {
+          callback: async () => {
             this.gapi = (window as any).gapi;
+            await this.gapi.client.init({ apiKey: this.apiKey });
             this.pickerApiLoaded = true;
             clearTimeout(timeout);
             resolve();
