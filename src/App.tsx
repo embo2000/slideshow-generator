@@ -77,7 +77,7 @@ function App() {
 
 const getTotalPhotos = () => {
   return Object.values(classData).reduce((total, photos) => 
-    total + (Array.isArray(photos) ? photos.length : 0), 0
+    total + (photos && Array.isArray(photos) ? photos.length : 0), 0
   );
 };
 
