@@ -82,7 +82,7 @@ const getTotalPhotos = () => {
 };
 
   const getClassesWithPhotos = () => {
-    return classes.filter(groupName => (classData[groupName] || []).length > 0);
+    return classes.filter(groupName => (classData[groupName] ?? []).length > 0);
   };
 
   // Calculate total steps: image groups + transitions + background + music + preview
