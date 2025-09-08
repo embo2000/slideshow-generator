@@ -146,6 +146,22 @@ function App() {
     setCurrentStep(0); // Reset to first step
   };
 
+  const handleClassesUpdate = (newClasses: string[]) => {
+    // Update class names and migrate existing photo data
+    const newClassData: ClassData = {};
+    
+    newClasses.forEach((newClassName, index) => {
+      const oldClassName = classes[index];
+      if (oldClassName && classData[oldClassName]) {
+        // Migrate photos from old class name to new class name
+        newClassData[newClassName] = classData[oldClassName];
+      }
+    });
+    
+    setClasses(newClasses);
+    setClassData(newClassData);
+  };
+
   const handleNext = () => {
     if (currentStep < totalSteps - 1) {
       setCurrentStep(currentStep + 1);
@@ -290,7 +306,7 @@ function App() {
       {showSettings && (
         <SettingsModal
           classes={classes}
-          onUpdateClasses={setClasses}
+          onUpdateClasses={handleClassesUpdate}
           onClose={() => setShowSettings(false)}
         />
       )}
