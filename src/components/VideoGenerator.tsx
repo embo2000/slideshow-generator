@@ -23,6 +23,11 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
+  // Auto-start video generation when component mounts
+  useEffect(() => {
+    generateVideo();
+  }, []);
+
   // Transition helper functions
   const applyTransition = (
     ctx: CanvasRenderingContext2D,
@@ -460,15 +465,6 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
           )}
 
           <div className="flex justify-center space-x-4">
-            {!isGenerating && !videoUrl && (
-              <button
-                onClick={generateVideo}
-                className="inline-flex items-center px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-medium transition-all duration-200 shadow-lg transform hover:scale-105"
-              >
-                <Play className="h-5 w-5 mr-2" />
-                Generate Enhanced Video
-              </button>
-            )}
           </div>
 
           <div className="mt-6 p-4 bg-gray-50 rounded-lg">
