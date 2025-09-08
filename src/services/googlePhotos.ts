@@ -1,83 +1,64 @@
-import { googleAuthService } from './googleAuth';
-
-export interface GooglePhoto {
+export interface GooglePhotoPickerResult {
   id: string;
-  baseUrl: string;
-  filename: string;
+  name: string;
+  url: string;
   mimeType: string;
-  mediaMetadata: {
-    width: string;
-    height: string;
-    creationTime: string;
-  };
-}
-
-export interface GooglePhotosAlbum {
-  id: string;
-  title: string;
-  productUrl: string;
-  mediaItemsCount: string;
-  coverPhotoBaseUrl?: string;
 }
 
 class GooglePhotosService {
-  private async getToken(): Promise<string> {
-    const token = googleAuthService.getAccessToken();
-    if (!token) throw new Error('Not signed in or token missing');
-    return token;
-  }
+  private pickerApiLoaded = false;
 
-  async getAlbums(): Promise<GooglePhotosAlbum[]> {
-    const token = await this.getToken();
+  async loadPickerApi(): Promise<void> {
+    if (this.pickerApiLoaded) return;
 
-    const response = await fetch('https://photoslibrary.googleapis.com/v1/albums?pageSize=50', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://apis.google.com/js/api.js';
+      script.onload = () => {
+        (window as any).gapi.load('picker', {
+          callback: () => {
+            this.pickerApiLoaded = true;
+            resolve();
+          },
+          onerror: () => reject(new Error('Failed to load Google Picker API')),
+        });
+      };
+      script.onerror = () => reject(new Error('Failed to load Google APIs script'));
+      document.head.appendChild(script);
     });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch albums: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.albums || [];
   }
 
-  async getPhotosFromAlbum(
-    albumId: string,
-    pageToken?: string
-  ): Promise<{ photos: GooglePhoto[]; nextPageToken?: string }> {
-    const token = await this.getToken();
+  async openPicker(oauthToken: string, maxPhotos = 5): Promise<GooglePhotoPickerResult[]> {
+    await this.loadPickerApi();
 
-    const body: any = { albumId, pageSize: 50 };
-    if (pageToken) body.pageToken = pageToken;
+    return new Promise((resolve, reject) => {
+      const view = new (window as any).google.picker.DocsView()
+        .setIncludeFolders(false)
+        .setMimeTypes('image/png,image/jpeg,image/jpg')
+        .setSelectFolderEnabled(false);
 
-    const response = await fetch('https://photoslibrary.googleapis.com/v1/mediaItems:search', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
+      const picker = new (window as any).google.picker.PickerBuilder()
+        .addView(view)
+        .setOAuthToken(oauthToken)
+        .setDeveloperKey('') // Optional, can leave blank if OAuth is used
+        .setCallback((data: any) => {
+          if (data.action === (window as any).google.picker.Action.PICKED) {
+            const docs = data.docs || [];
+            const results: GooglePhotoPickerResult[] = docs.slice(0, maxPhotos).map((doc: any) => ({
+              id: doc.id,
+              name: doc.name,
+              url: doc.url || doc.thumbnails?.[0]?.url,
+              mimeType: doc.mimeType,
+            }));
+            resolve(results);
+          } else if (data.action === (window as any).google.picker.Action.CANCEL) {
+            resolve([]);
+          }
+        })
+        .build();
+
+      picker.setVisible(true);
     });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch photos: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return { photos: data.mediaItems || [], nextPageToken: data.nextPageToken };
-  }
-
-  async downloadPhoto(photo: GooglePhoto): Promise<File> {
-    const downloadUrl = `${photo.baseUrl}=w${photo.mediaMetadata.width}-h${photo.mediaMetadata.height}`;
-    const resp = await fetch(downloadUrl);
-    if (!resp.ok) throw new Error('Failed to download photo');
-
-    const blob = await resp.blob();
-    return new File([blob], photo.filename, { type: photo.mimeType });
   }
 }
 
