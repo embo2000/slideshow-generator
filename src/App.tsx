@@ -140,34 +140,43 @@ const handleLoadSlideshow = (data: {
   selectedTransition?: TransitionType;
   classes?: string[];
 }) => {
-  // Fallback to default classes if missing
   const slideshowClasses = Array.isArray(data.classes) ? data.classes : DEFAULT_CLASSES;
 
-  // Normalize classData
+  console.log('slideshowClasses:', slideshowClasses);
+  
+  // Normalize classData first
   const normalizedClassData = normalizeLoadedClassData(data.classData);
+
+  // Ensure every class has an array (even if missing in loaded data)
   slideshowClasses.forEach(className => {
-    const photos = data.classData?.[className];
-    normalizedClassData[className] = Array.isArray(photos) ? photos : [];
+    if (!normalizedClassData[className]) normalizedClassData[className] = [];
   });
 
-  
   setClassData(normalizedClassData);
   setSelectedMusic(data.selectedMusic ?? null);
   setBackgroundImage(data.backgroundImage ?? null);
   setSelectedTransition(data.selectedTransition ?? TRANSITION_TYPES[0]);
   setClasses(slideshowClasses);
-  setCurrentStep(0); // Reset to first step
+  setCurrentStep(0);
 };
 
 
 const normalizeLoadedClassData = (loaded: any) => {
   const normalized: ClassData = {};
   Object.entries(loaded || {}).forEach(([className, images]) => {
-    // Make sure it's always an array
     normalized[className] = Array.isArray(images)
       ? images.map((img: string | File) => {
-          // If it's a Base64 string, wrap in an object with url property
-          return typeof img === 'string' ? { url: `data:image/jpeg;base64,${img}` } : img;
+          if (typeof img === 'string') {
+            // Check if the string already has a data URL prefix
+            if (img.startsWith('data:image/')) return { url: img };
+
+            // Optionally detect image type from first few bytes
+            let type = 'jpeg';
+            if (img.startsWith('iVBOR')) type = 'png'; // PNG signature in Base64
+            return { url: `data:image/${type};base64,${img}` };
+          } else {
+            return img;
+          }
         })
       : [];
   });
