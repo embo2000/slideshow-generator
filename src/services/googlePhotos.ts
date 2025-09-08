@@ -1,77 +1,35 @@
 export interface GooglePhotoPickerResult {
   id: string;
-  url: string;
-  name: string;
-  mimeType: string;
-  type: 'IMAGE' | 'VIDEO';
-}
-
-declare global {
-  interface Window {
-    GooglePhotosPicker: any;
-  }
+  baseUrl: string;
+  filename?: string;
+  mimeType?: string;
+  type: 'PHOTO' | 'VIDEO';
 }
 
 class GooglePhotosService {
-  private pickerScriptLoaded = false;
-
-  // Load the new Picker script
-  loadPickerScript(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (this.pickerScriptLoaded) return resolve();
-
-      const script = document.createElement('script');
-      script.src = 'https://photoslibrary.googleapis.com/photospicker/v1/js';
-      script.onload = () => {
-        this.pickerScriptLoaded = true;
-        resolve();
-      };
-      script.onerror = () => reject(new Error('Failed to load Google Photos Picker script'));
-      document.body.appendChild(script);
-    });
+  // Get a new session URL from the server
+  async getSessionUrl(): Promise<string> {
+    const res = await fetch('/new_session', { credentials: 'include' });
+    if (!res.ok) throw new Error('Failed to get Google Photos session');
+    const data = await res.json();
+    return data.url; // session URL returned by your server
   }
 
-  // Open the Google Photos Picker
-  openPicker(
-    accessToken: string,
-    sessionData: any, // obtained from your backend via /get_session
-    maxSelectable = 50
-  ): Promise<GooglePhotoPickerResult[]> {
-    return new Promise(async (resolve, reject) => {
-      if (!window.GooglePhotosPicker) {
-        reject(new Error('GooglePhotosPicker is not available on window'));
-        return;
-      }
+  // Poll the server for selected media items
+  async pollSelectedMedia(): Promise<GooglePhotoPickerResult[]> {
+    const res = await fetch('/get_session', { credentials: 'include' });
+    if (!res.ok) throw new Error('Failed to get selected media');
+    const data = await res.json();
 
-      try {
-        const picker = window.GooglePhotosPicker({
-          developerKey: import.meta.env.VITE_GOOGLE_DEV_KEY,
-          clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-          token: accessToken,
-          session: sessionData,
-          maxSelectable,
-          view: 'ALBUMS', // or 'MEDIA_ITEMS', 'SHARED_ALBUMS' depending on what you want
-          callback: (result: any) => {
-            if (result && result.mediaItems) {
-              const mapped: GooglePhotoPickerResult[] = result.mediaItems.map((item: any) => ({
-                id: item.id,
-                url: item.baseUrl, // you can append =w128-h128 for thumbnail sizing
-                name: item.filename,
-                mimeType: item.mimeType,
-                type: item.mediaType, // IMAGE or VIDEO
-              }));
-              resolve(mapped);
-            } else {
-              resolve([]);
-            }
-          },
-        });
+    if (!data.mediaItemsSet) return []; // no selection yet
 
-        picker.open();
-      } catch (err) {
-        reject(err);
-      }
-    });
+    return data.mediaItemsSet.map((item: any) => ({
+      id: item.id,
+      baseUrl: item.baseUrl,
+      filename: item.filename,
+      mimeType: item.mimeType,
+      type: item.mimeType?.startsWith('video') ? 'VIDEO' : 'PHOTO',
+    }));
   }
 }
 
