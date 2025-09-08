@@ -26,32 +26,50 @@ class GoogleDriveService {
   private folderName = 'Slideshow Generator';
   private folderId: string | null = null;
 
+  private async authHeaders(): Promise<HeadersInit> {
+    const token = googleAuthService.getAccessToken();
+    if (!token) throw new Error('No access token available');
+    return { Authorization: `Bearer ${token}` };
+  }
+
   private async ensureFolder(): Promise<string> {
     if (this.folderId) return this.folderId;
 
-    const gapi = (window as any).gapi;
-    
-    // Check if folder exists
-    const searchResponse = await gapi.client.drive.files.list({
-      q: `name='${this.folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-      fields: 'files(id, name)',
-    });
+    const headers = await this.authHeaders();
 
-    if (searchResponse.result.files.length > 0) {
-      this.folderId = searchResponse.result.files[0].id;
+    // Search for existing folder
+    const searchRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+        `name='${this.folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`
+      )}&fields=files(id,name)`,
+      { headers }
+    );
+
+    const searchData = await searchRes.json();
+
+    if (searchData.files && searchData.files.length > 0) {
+      this.folderId = searchData.files[0].id;
       return this.folderId;
     }
 
-    // Create folder if it doesn't exist
-    const createResponse = await gapi.client.drive.files.create({
-      resource: {
-        name: this.folderName,
-        mimeType: 'application/vnd.google-apps.folder',
-      },
-      fields: 'id',
-    });
+    // Create folder if not found
+    const createRes = await fetch(
+      'https://www.googleapis.com/drive/v3/files',
+      {
+        method: 'POST',
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: this.folderName,
+          mimeType: 'application/vnd.google-apps.folder',
+        }),
+      }
+    );
 
-    this.folderId = createResponse.result.id;
+    const createData = await createRes.json();
+    this.folderId = createData.id;
     return this.folderId;
   }
 
@@ -60,7 +78,7 @@ class GoogleDriveService {
       const reader = new FileReader();
       reader.onload = () => {
         const result = reader.result as string;
-        resolve(result.split(',')[1]); // Remove data:image/...;base64, prefix
+        resolve(result.split(',')[1]); // strip prefix
       };
       reader.onerror = reject;
       reader.readAsDataURL(file);
@@ -90,16 +108,17 @@ class GoogleDriveService {
     }
 
     const folderId = await this.ensureFolder();
+    const headers = await this.authHeaders();
 
     // Convert files to base64
     const processedClassData: { [className: string]: string[] } = {};
     for (const [className, files] of Object.entries(classData)) {
       processedClassData[className] = await Promise.all(
-        files.map(file => this.fileToBase64(file))
+        files.map((file) => this.fileToBase64(file))
       );
     }
 
-    const processedBackgroundImage = backgroundImage 
+    const processedBackgroundImage = backgroundImage
       ? await this.fileToBase64(backgroundImage.file)
       : null;
 
@@ -111,43 +130,44 @@ class GoogleDriveService {
       selectedMusic,
       backgroundImage: processedBackgroundImage,
       selectedTransition,
-      settings: {
-        classes,
-      },
+      settings: { classes },
     };
 
-    const gapi = (window as any).gapi;
-    const boundary = '-------314159265358979323846';
-    const delimiter = "\r\n--" + boundary + "\r\n";
-    const close_delim = "\r\n--" + boundary + "--";
-
+    // Metadata
     const metadata = {
       name: `${name}.json`,
       parents: [folderId],
       mimeType: 'application/json',
     };
 
+    // Multipart body
+    const boundary = '-------314159265358979323846';
+    const delimiter = `\r\n--${boundary}\r\n`;
+    const closeDelim = `\r\n--${boundary}--`;
+
     const multipartRequestBody =
       delimiter +
-      'Content-Type: application/json\r\n\r\n' +
+      'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
       JSON.stringify(metadata) +
       delimiter +
       'Content-Type: application/json\r\n\r\n' +
       JSON.stringify(slideshowData) +
-      close_delim;
+      closeDelim;
 
-    const request = gapi.client.request({
-      path: 'https://www.googleapis.com/upload/drive/v3/files',
-      method: 'POST',
-      params: { uploadType: 'multipart' },
-      headers: {
-        'Content-Type': 'multipart/related; boundary="' + boundary + '"',
-      },
-      body: multipartRequestBody,
-    });
+    const uploadRes = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+      {
+        method: 'POST',
+        headers: {
+          ...headers,
+          'Content-Type': `multipart/related; boundary=${boundary}`,
+        },
+        body: multipartRequestBody,
+      }
+    );
 
-    const response = await request;
-    return response.result.id;
+    const uploadData = await uploadRes.json();
+    return uploadData.id;
   }
 
   async loadSlideshow(fileId: string): Promise<{
@@ -162,26 +182,29 @@ class GoogleDriveService {
       throw new Error('User not signed in');
     }
 
-    const gapi = (window as any).gapi;
-    
-    const response = await gapi.client.drive.files.get({
-      fileId: fileId,
-      alt: 'media',
-    });
+    const headers = await this.authHeaders();
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      { headers }
+    );
 
-    const slideshowData: SlideshowData = JSON.parse(response.body);
+    const slideshowData: SlideshowData = await res.json();
 
-    // Convert base64 back to files
+    // Convert back to files
     const processedClassData: { [className: string]: File[] } = {};
     for (const [className, base64Array] of Object.entries(slideshowData.classData)) {
-      processedClassData[className] = base64Array.map((base64, index) => 
+      processedClassData[className] = base64Array.map((base64, index) =>
         this.base64ToFile(base64, `${className}_${index}.jpg`, 'image/jpeg')
       );
     }
 
     const processedBackgroundImage = slideshowData.backgroundImage
       ? {
-          file: this.base64ToFile(slideshowData.backgroundImage, 'background.jpg', 'image/jpeg'),
+          file: this.base64ToFile(
+            slideshowData.backgroundImage,
+            'background.jpg',
+            'image/jpeg'
+          ),
           url: `data:image/jpeg;base64,${slideshowData.backgroundImage}`,
         }
       : null;
@@ -202,15 +225,18 @@ class GoogleDriveService {
     }
 
     const folderId = await this.ensureFolder();
-    const gapi = (window as any).gapi;
+    const headers = await this.authHeaders();
 
-    const response = await gapi.client.drive.files.list({
-      q: `'${folderId}' in parents and name contains '.json' and trashed=false`,
-      fields: 'files(id, name, createdTime, modifiedTime, size)',
-      orderBy: 'modifiedTime desc',
-    });
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+        `'${folderId}' in parents and name contains '.json' and trashed=false`
+      )}&fields=files(id,name,createdTime,modifiedTime,size)&orderBy=modifiedTime desc`,
+      { headers }
+    );
 
-    return response.result.files.map((file: any) => ({
+    const data = await res.json();
+
+    return data.files.map((file: any) => ({
       id: file.id,
       name: file.name.replace('.json', ''),
       createdTime: file.createdTime,
@@ -224,9 +250,10 @@ class GoogleDriveService {
       throw new Error('User not signed in');
     }
 
-    const gapi = (window as any).gapi;
-    await gapi.client.drive.files.delete({
-      fileId: fileId,
+    const headers = await this.authHeaders();
+    await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+      method: 'DELETE',
+      headers,
     });
   }
 }
