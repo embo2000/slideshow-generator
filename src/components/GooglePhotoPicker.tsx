@@ -1,109 +1,42 @@
-// src/components/GooglePhotoPicker.tsx
-import React, { useEffect, useState } from 'react';
-import { googlePhotosService, GooglePhoto } from '../services/googlePhotos';
+import React, { useState } from 'react';
+import { googlePhotosService, GooglePhotoPickerResult } from '../services/googlePhotos';
 
-export const GooglePhotoPicker: React.FC = () => {
+const GooglePhotoPicker: React.FC = () => {
+  const [photos, setPhotos] = useState<GooglePhotoPickerResult[]>([]);
   const [loading, setLoading] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [mediaItems, setMediaItems] = useState<GooglePhoto[]>([]);
-  const [selectedItem, setSelectedItem] = useState<GooglePhoto | null>(null);
-  const [nextPageToken, setNextPageToken] = useState<string | null>(null);
 
-  // Start a picker session on mount
-  useEffect(() => {
-    const startPicker = async () => {
-      setLoading(true);
-      try {
-        const session = await googlePhotosService.createSession();
-        setSessionId(session.id);
-      } catch (err) {
-        console.error('Failed to start session', err);    
-      } finally {
-        setLoading(false);
-      }
-    };
-    startPicker();
-  }, []);
-
-  // Poll for session completion
-  useEffect(() => {
-    if (!sessionId) return;
-    const interval = setInterval(async () => {
-      try {
-        const session = await googlePhotosService.getSession();
-        if (session.mediaItemsSet) {
-          clearInterval(interval);
-          loadImages();
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [sessionId]);
-
-  const loadImages = async (pageToken?: string) => {
+  const handleOpenPicker = async () => {
+    setLoading(true);
     try {
-      const { mediaItems: items, nextPageToken } = await googlePhotosService.fetchImages(pageToken);
-      setMediaItems(items);
-      setNextPageToken(nextPageToken || null);
+      // You need a valid access token here
+      const accessToken = await getAccessTokenSomehow();
+      const selectedPhotos = await googlePhotosService.openPicker(accessToken, 50);
+      setPhotos(selectedPhotos);
     } catch (err) {
-      console.error('Failed to load images', err);
+      console.error('Failed to open Google Photos Picker:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="photo-picker">
-      {loading && <p>Loading Google Photos Picker...</p>}
+    <div>
+      <button onClick={handleOpenPicker} disabled={loading}>
+        {loading ? 'Loading...' : 'Pick Photos from Google'}
+      </button>
 
-      <div className="grid grid-cols-4 gap-4 p-4">
-        {mediaItems.map((item) => (
+      <div className="photo-grid">
+        {photos.map((photo) => (
           <img
-            key={item.id}
-            src={`${item.baseUrl}=w128-h128`}
-            alt={item.name}
-            className="cursor-pointer rounded-md"
-            onClick={() => setSelectedItem(item)}
+            key={photo.id}
+            src={photo.url}
+            alt={photo.name}
+            style={{ width: 100, height: 100, objectFit: 'cover', margin: 4 }}
           />
         ))}
       </div>
-
-      {nextPageToken && (
-        <button onClick={() => loadImages(nextPageToken)} className="btn mt-4">
-          Next Page
-        </button>
-      )}
-
-      {/* Modal */}
-      {selectedItem && (
-        <div className="modal fixed inset-0 bg-gray-50 bg-opacity-75 flex items-center justify-center z-50">
-          <div className="bg-white border p-4 rounded-lg relative max-w-2xl w-full">
-            <button
-              className="absolute top-2 right-2 text-red-500 font-bold"
-              onClick={() => setSelectedItem(null)}
-            >
-              Close
-            </button>
-            {selectedItem.type === 'VIDEO' ? (
-              <video src={`${selectedItem.baseUrl}=dv`} controls className="max-w-full" />
-            ) : (
-              <img src={selectedItem.baseUrl} alt={selectedItem.name} className="max-w-full" />
-            )}
-
-            <table className="mt-4 w-full border">
-              <tbody>
-                {selectedItem.metadata &&
-                  Object.entries(selectedItem.metadata).map(([key, value]) => (
-                    <tr key={key}>
-                      <td className="border p-1 font-bold">{key}</td>
-                      <td className="border p-1">{JSON.stringify(value)}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
+
+export default GooglePhotoPicker;
