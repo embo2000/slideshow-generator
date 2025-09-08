@@ -75,9 +75,11 @@ function App() {
     }));
   };
 
-  const getTotalPhotos = () => {
-    return Object.values(classData).reduce((total, photos) => total + photos.length, 0);
-  };
+const getTotalPhotos = () => {
+  return Object.values(classData).reduce((total, photos) => 
+    total + (photos?.length || 0), 0
+  , 0);
+};
 
   const getClassesWithPhotos = () => {
     return classes.filter(groupName => (classData[groupName] || []).length > 0);
@@ -97,7 +99,7 @@ function App() {
     
     // Mark image group steps as completed if they have photos
     classes.forEach((groupName, index) => {
-      if ((classData[groupName] || []).length > 0) {
+      if ((classData[groupName] ?? []).length> 0) {
         completed[index] = true;
       }
     });
