@@ -67,8 +67,9 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({ onAuthChange }) => 
   // Show error state if initialization failed
   if (initError) {
     return (
-      <div className="flex items-center space-x-2 text-red-500">
-        <span className="text-sm">Google Auth unavailable</span>
+      <div className="flex flex-col items-start space-y-1 text-red-500 max-w-md">
+        <span className="text-sm font-medium">Google Auth unavailable</span>
+        <span className="text-xs text-red-400">{initError}</span>
       </div>
     );
   }

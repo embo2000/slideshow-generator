@@ -85,10 +85,14 @@ class GoogleAuthService {
   private async initializeGapi(): Promise<void> {
     this.gapi = (window as any).gapi;
     
-    await this.gapi.client.init({
-      apiKey: this.apiKey,
-      discoveryDocs: this.discoveryDocs,
-    });
+    try {
+      await this.gapi.client.init({
+        apiKey: this.apiKey,
+        discoveryDocs: this.discoveryDocs,
+      });
+    } catch (error) {
+      throw new Error('Google APIs not properly enabled. Please enable Google Drive API and Google+ API in your Google Cloud Console project, then restart the development server.');
+    }
 
     this.tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
       client_id: this.clientId,
