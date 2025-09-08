@@ -1,48 +1,67 @@
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
 import { googlePhotosService, GooglePhotoPickerResult } from "../services/googlePhotos";
 
 interface GooglePhotoPickerProps {
-  accessToken: string;
-  maxPhotos?: number;
-  onSelection?: (photos: GooglePhotoPickerResult[]) => void;
+  accessToken: string; // OAuth2 token obtained after login
+  sessionData: any; // session object from your backend /get_session
+  maxSelectable?: number;
+  onSelected: (items: GooglePhotoPickerResult[]) => void;
 }
 
-const GooglePhotoPicker: React.FC<GooglePhotoPickerProps> = ({
+export const GooglePhotoPicker = ({
   accessToken,
-  maxPhotos = 50,
-  onSelection,
-}) => {
-  const [loading, setLoading] = useState(false);
+  sessionData,
+  maxSelectable = 50,
+  onSelected,
+}: GooglePhotoPickerProps) => {
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const handleOpenPicker = async () => {
-    setError(null);
-    setLoading(true);
-    try {
-      const selectedPhotos = await googlePhotosService.openPicker(accessToken, maxPhotos);
-      setLoading(false);
-      if (onSelection) {
-        onSelection(selectedPhotos);
+  useEffect(() => {
+    const loadPicker = async () => {
+      try {
+        await googlePhotosService.loadPickerScript();
+        setLoading(false);
+      } catch (err: any) {
+        console.error("Failed to load Google Photos Picker script", err);
+        setError("Failed to load Google Photos Picker script");
+        setLoading(false);
       }
+    };
+
+    loadPicker();
+  }, []);
+
+  const handleOpenPicker = async () => {
+    if (!accessToken || !sessionData) {
+      setError("Missing access token or session data");
+      return;
+    }
+
+    try {
+      const selected = await googlePhotosService.openPicker(
+        accessToken,
+        sessionData,
+        maxSelectable
+      );
+      onSelected(selected);
     } catch (err: any) {
       console.error("Failed to open Google Photos Picker:", err);
-      setError(err.message || "Unknown error");
-      setLoading(false);
+      setError(err.message || "Unknown error opening picker");
     }
   };
+
+  if (loading) return <div>Loading Google Photos Picker...</div>;
+  if (error) return <div className="text-red-600">{error}</div>;
 
   return (
     <div>
       <button
         onClick={handleOpenPicker}
-        disabled={loading}
-        className="px-4 py-2 border rounded bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50"
+        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
       >
-        {loading ? "Loading..." : "Open Google Photos Picker"}
+        Open Google Photos Picker
       </button>
-      {error && <div className="mt-2 text-red-600">{error}</div>}
     </div>
   );
 };
-
-export default GooglePhotoPicker;
