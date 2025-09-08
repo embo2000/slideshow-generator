@@ -134,25 +134,30 @@ const getTotalPhotos = () => {
   };
 
 const handleLoadSlideshow = (data: {
-  classData: ClassData;
-  selectedMusic: MusicTrack | null;
-  backgroundImage: BackgroundImage | null;
-  selectedTransition: TransitionType;
-  classes: string[];
+  classData?: ClassData;
+  selectedMusic?: MusicTrack | null;
+  backgroundImage?: BackgroundImage | null;
+  selectedTransition?: TransitionType;
+  classes?: string[];
 }) => {
+  // Fallback to default classes if missing
+  const slideshowClasses = Array.isArray(data.classes) ? data.classes : DEFAULT_CLASSES;
+
+  // Normalize classData
   const normalizedClassData: ClassData = {};
-  data.classes.forEach(className => {
+  slideshowClasses.forEach(className => {
     const photos = data.classData?.[className];
     normalizedClassData[className] = Array.isArray(photos) ? photos : [];
   });
 
   setClassData(normalizedClassData);
-  setSelectedMusic(data.selectedMusic);
-  setBackgroundImage(data.backgroundImage);
-  setSelectedTransition(data.selectedTransition);
-  setClasses(data.classes);
+  setSelectedMusic(data.selectedMusic ?? null);
+  setBackgroundImage(data.backgroundImage ?? null);
+  setSelectedTransition(data.selectedTransition ?? TRANSITION_TYPES[0]);
+  setClasses(slideshowClasses);
   setCurrentStep(0); // Reset to first step
 };
+
 
   const handleClassesUpdate = (newClasses: string[]) => {
     // Update class names and migrate existing photo data
