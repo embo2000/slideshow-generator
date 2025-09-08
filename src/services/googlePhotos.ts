@@ -23,81 +23,88 @@ export interface GooglePhotosAlbum {
 class GooglePhotosService {
   private async getToken(): Promise<string> {
     const token = googleAuthService.getAccessToken();
-    if (!token) throw new Error('Not signed in');
+    if (!token) {
+      throw new Error('Not signed in');
+    }
     return token;
   }
 
-  async getAlbums(pageSize = 50, pageToken?: string): Promise<{ albums: GooglePhotosAlbum[]; nextPageToken?: string }> {
-    const token = await this.getToken();
+  private async fetchWithTokenRetry(input: RequestInfo, init?: RequestInit): Promise<any> {
+    try {
+      const token = await this.getToken();
+      const headers = { ...init?.headers, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+      const response = await fetch(input, { ...init, headers });
 
-    const url = new URL('https://photoslibrary.googleapis.com/v1/albums');
-    url.searchParams.set('pageSize', pageSize.toString());
-    if (pageToken) url.searchParams.set('pageToken', pageToken);
+      if (response.status === 403) {
+        // Token likely missing scopes; refresh
+        await googleAuthService.signIn();
+        const newToken = await this.getToken();
+        const retryHeaders = { ...init?.headers, Authorization: `Bearer ${newToken}`, 'Content-Type': 'application/json' };
+        const retryResponse = await fetch(input, { ...init, headers: retryHeaders });
 
-    const res = await fetch(url.toString(), {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+        if (!retryResponse.ok) {
+          const errText = await retryResponse.text();
+          throw new Error(`Failed after token refresh: ${retryResponse.status} ${errText}`);
+        }
+        return retryResponse.json();
+      }
 
-    if (!res.ok) {
-      throw new Error(`Failed to fetch albums: ${res.status}`);
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Request failed: ${response.status} ${errText}`);
+      }
+
+      return response.json();
+    } catch (err) {
+      throw err;
     }
+  }
 
-    const data = await res.json();
-    return { albums: data.albums || [], nextPageToken: data.nextPageToken };
+  async getAlbums(): Promise<GooglePhotosAlbum[]> {
+    const data = await this.fetchWithTokenRetry('https://photoslibrary.googleapis.com/v1/albums?pageSize=50');
+    return data.albums || [];
   }
 
   async getPhotosFromAlbum(
     albumId: string,
-    pageSize = 50,
     pageToken?: string
   ): Promise<{ photos: GooglePhoto[]; nextPageToken?: string }> {
-    const token = await this.getToken();
-
-    const body: any = { albumId, pageSize };
+    const body: any = { albumId, pageSize: 50 };
     if (pageToken) body.pageToken = pageToken;
 
-    const res = await fetch('https://photoslibrary.googleapis.com/v1/mediaItems:search', {
+    const data = await this.fetchWithTokenRetry('https://photoslibrary.googleapis.com/v1/mediaItems:search', {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(body),
     });
 
-    if (!res.ok) {
-      throw new Error(`Failed to fetch photos: ${res.status}`);
-    }
-
-    const data = await res.json();
-    return { photos: data.mediaItems || [], nextPageToken: data.nextPageToken };
+    return {
+      photos: data.mediaItems || [],
+      nextPageToken: data.nextPageToken,
+    };
   }
 
-  async getAllPhotos(pageSize = 50, pageToken?: string): Promise<{ photos: GooglePhoto[]; nextPageToken?: string }> {
-    const token = await this.getToken();
-
+  async getAllPhotos(pageToken?: string): Promise<{ photos: GooglePhoto[]; nextPageToken?: string }> {
     const url = new URL('https://photoslibrary.googleapis.com/v1/mediaItems');
-    url.searchParams.set('pageSize', pageSize.toString());
+    url.searchParams.set('pageSize', '50');
     if (pageToken) url.searchParams.set('pageToken', pageToken);
 
-    const res = await fetch(url.toString(), {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    if (!res.ok) {
-      throw new Error(`Failed to fetch photos: ${res.status}`);
-    }
-
-    const data = await res.json();
-    return { photos: data.mediaItems || [], nextPageToken: data.nextPageToken };
+    const data = await this.fetchWithTokenRetry(url.toString());
+    return {
+      photos: data.mediaItems || [],
+      nextPageToken: data.nextPageToken,
+    };
   }
 
   async downloadPhoto(photo: GooglePhoto): Promise<File> {
+    // Use original dimensions
     const downloadUrl = `${photo.baseUrl}=w${photo.mediaMetadata.width}-h${photo.mediaMetadata.height}`;
-    const res = await fetch(downloadUrl);
-    if (!res.ok) throw new Error(`Failed to download photo: ${res.status}`);
+    const response = await fetch(downloadUrl);
 
-    const blob = await res.blob();
+    if (!response.ok) {
+      throw new Error(`Failed to download photo: ${response.status}`);
+    }
+
+    const blob = await response.blob();
     return new File([blob], photo.filename, { type: photo.mimeType });
   }
 }
