@@ -133,20 +133,26 @@ const getTotalPhotos = () => {
     return false;
   };
 
-  const handleLoadSlideshow = (data: {
-    classData: ClassData;
-    selectedMusic: MusicTrack | null;
-    backgroundImage: BackgroundImage | null;
-    selectedTransition: TransitionType;
-    classes: string[];
-  }) => {
-    setClassData(data.classData);
-    setSelectedMusic(data.selectedMusic);
-    setBackgroundImage(data.backgroundImage);
-    setSelectedTransition(data.selectedTransition);
-    setClasses(data.classes);
-    setCurrentStep(0); // Reset to first step
-  };
+const handleLoadSlideshow = (data: {
+  classData: ClassData;
+  selectedMusic: MusicTrack | null;
+  backgroundImage: BackgroundImage | null;
+  selectedTransition: TransitionType;
+  classes: string[];
+}) => {
+  const normalizedClassData: ClassData = {};
+  data.classes.forEach(className => {
+    const photos = data.classData?.[className];
+    normalizedClassData[className] = Array.isArray(photos) ? photos : [];
+  });
+
+  setClassData(normalizedClassData);
+  setSelectedMusic(data.selectedMusic);
+  setBackgroundImage(data.backgroundImage);
+  setSelectedTransition(data.selectedTransition);
+  setClasses(data.classes);
+  setCurrentStep(0); // Reset to first step
+};
 
   const handleClassesUpdate = (newClasses: string[]) => {
     // Update class names and migrate existing photo data
