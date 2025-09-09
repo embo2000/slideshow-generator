@@ -15,7 +15,7 @@ interface GoogleAuthResponse {
 class GoogleAuthService {
   private clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   private scopes =
-    'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/photospicker.mediaitems.readonly profile';
+    'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
 
   private tokenClient: any = null;
   private isInitialized = false;
