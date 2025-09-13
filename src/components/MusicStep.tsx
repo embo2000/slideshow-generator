@@ -294,84 +294,81 @@ const MusicStep: React.FC<MusicStepProps> = ({
           </div>
         )}
 
-        {/* Current/Custom Tracks */}
-        {allTracks.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {allTracks.map((track) => (
-              <div
-                key={track.id}
-                className={`p-6 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
-                  selectedTrack?.id === track.id
-                    ? 'border-teal-500 bg-teal-50 shadow-md'
-                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                }`}
-                onClick={() => onSelectTrack(track)}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center space-x-3">
-                    <div className={`p-2 rounded-lg ${
-                      selectedTrack?.id === track.id
-                        ? 'bg-teal-100 text-teal-600'
-                        : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      <Music className="h-5 w-5" />
+        {/* Current/Custom Tracks - Only show if there are custom tracks */}
+        {allTracks.length > 0 && (
+          <div className="space-y-4">
+            <div className="text-center p-4 bg-blue-50 rounded-lg">
+              <Music className="h-8 w-8 text-teal-600 mx-auto mb-2" />
+              <h3 className="font-medium text-teal-900 mb-1">Your Custom Audio Tracks</h3>
+              <p className="text-sm text-teal-700">
+                Select from your uploaded custom audio tracks
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {allTracks.map((track) => (
+                <div
+                  key={track.id}
+                  className={`p-6 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                    selectedTrack?.id === track.id
+                      ? 'border-teal-500 bg-teal-50 shadow-md'
+                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  }`}
+                  onClick={() => onSelectTrack(track)}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-3">
+                      <div className={`p-2 rounded-lg ${
+                        selectedTrack?.id === track.id
+                          ? 'bg-teal-100 text-teal-600'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        <Music className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900">{track.name}</h3>
+                        <span className="text-xs text-teal-600 font-medium">Custom Audio</span>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">{track.name}</h3>
-                      <span className="text-xs text-teal-600 font-medium">Custom Audio</span>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          togglePlay(track);
+                        }}
+                        className="p-2 hover:bg-white rounded-full transition-colors"
+                      >
+                        {playingTrack === track.id ? (
+                          <Pause className="h-5 w-5 text-teal-600" />
+                        ) : (
+                          <Play className="h-5 w-5 text-gray-600" />
+                        )}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeCustomTrack(track.id);
+                        }}
+                        className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        togglePlay(track);
-                      }}
-                      className="p-2 hover:bg-white rounded-full transition-colors"
-                    >
-                      {playingTrack === track.id ? (
-                        <Pause className="h-5 w-5 text-teal-600" />
-                      ) : (
-                        <Play className="h-5 w-5 text-gray-600" />
-                      )}
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeCustomTrack(track.id);
-                      }}
-                      className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
+                  
+                  <div className="flex items-center space-x-2 text-sm text-gray-500">
+                    <Volume2 className="h-4 w-4" />
+                    <span>{track.duration ? `${track.duration}s` : 'Loading...'}</span>
                   </div>
+                  
+                  {selectedTrack?.id === track.id && (
+                    <div className="mt-3 text-sm font-medium text-teal-600">
+                      ✓ Selected
+                    </div>
+                  )}
                 </div>
-                
-                <div className="flex items-center space-x-2 text-sm text-gray-500">
-                  <Volume2 className="h-4 w-4" />
-                  <span>{track.duration ? `${track.duration}s` : 'Loading...'}</span>
-                </div>
-                
-                {selectedTrack?.id === track.id && (
-                  <div className="mt-3 text-sm font-medium text-teal-600">
-                    ✓ Selected
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className={`text-center py-8 bg-gray-50 rounded-lg ${existingMusicFiles.length > 0 ? 'mt-6' : ''}`}>
-            <Music className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {existingMusicFiles.length > 0 ? 'No Custom Audio Added' : 'No Audio Files Yet'}
-            </h3>
-            <p className="text-gray-500 mb-4">
-              {existingMusicFiles.length > 0 
-                ? 'Add custom audio files below or select from your library above'
-                : 'Upload your own audio files or add links to get started'
-              }
-            </p>
+              ))}
+            </div>
           </div>
         )}
 
