@@ -17,6 +17,7 @@ export interface SlideshowData {
   selectedMusic: any;
   backgroundImage: string | null; // Base64 encoded
   selectedTransition: any;
+  slideDuration: number;
   settings: {
     classes: string[];
   };
@@ -82,7 +83,8 @@ class GoogleDriveService {
     selectedMusic: any,
     backgroundImage: { file: File; url: string } | null,
     selectedTransition: any,
-    classes: string[]
+    classes: string[],
+    slideDuration: number = 3
   ): Promise<string> {
     const token = await this.getToken();
     const folderId = await this.ensureFolder();
@@ -118,6 +120,7 @@ class GoogleDriveService {
       selectedMusic,
       backgroundImage: processedBackground,
       selectedTransition,
+      slideDuration,
       settings: { classes },
     };
 

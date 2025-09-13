@@ -45,6 +45,7 @@ function App() {
   const [selectedTransition, setSelectedTransition] = useState<TransitionType>(TRANSITION_TYPES[0]);
   const [currentUser, setCurrentUser] = useState<GoogleUser | null>(null);
   const [showSlideshowManager, setShowSlideshowManager] = useState(false);
+  const [slideDuration, setSlideDuration] = useState(3); // Default 3 seconds per slide
 
   // Load groups settings when user signs in
   useEffect(() => {
@@ -148,6 +149,7 @@ const handleLoadSlideshow = (data: {
   backgroundImage?: BackgroundImage | null;
   selectedTransition?: TransitionType;
   classes?: string[];
+  slideDuration?: number;
 }) => {
   const slideshowClasses = Array.isArray(data.classes) ? data.classes : DEFAULT_CLASSES;
 
@@ -165,6 +167,7 @@ const handleLoadSlideshow = (data: {
   setSelectedMusic(data.selectedMusic ?? null);
   setBackgroundImage(data.backgroundImage ?? null);
   setSelectedTransition(data.selectedTransition ?? TRANSITION_TYPES[0]);
+  setSlideDuration(data.slideDuration ?? 3);
   setClasses(slideshowClasses);
   setCurrentStep(0);
 };
@@ -287,6 +290,8 @@ const normalizeLoadedClassData = (loaded: any) => {
           selectedMusic={selectedMusic}
           backgroundImage={backgroundImage}
           selectedTransition={selectedTransition}
+          slideDuration={slideDuration}
+          onSlideDurationChange={setSlideDuration}
           onGenerate={generateVideo}
           onEdit={handleEditStep}
         />
@@ -375,6 +380,7 @@ const normalizeLoadedClassData = (loaded: any) => {
             backgroundImage,
             selectedTransition,
             classes,
+            slideDuration,
           }}
           onLoadSlideshow={handleLoadSlideshow}
           onClose={() => setShowSlideshowManager(false)}
@@ -387,6 +393,7 @@ const normalizeLoadedClassData = (loaded: any) => {
           selectedMusic={selectedMusic}
           backgroundImage={backgroundImage}
           selectedTransition={selectedTransition}
+          slideDuration={slideDuration}
           onClose={() => setShowVideoGenerator(false)}
         />
       )}

@@ -16,6 +16,7 @@ export interface VideoSettings {
   height: number;
   fps: number;
   duration: number;
+  slideDuration: number; // Duration in seconds for each slide
 }
 
 export interface BackgroundImage {

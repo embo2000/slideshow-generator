@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Edit, Music, Image as ImageIcon, Zap, Camera } from 'lucide-react';
+import { Play, Edit, Music, Image as ImageIcon, Zap, Camera, Clock } from 'lucide-react';
 import { ClassData, MusicTrack, BackgroundImage, TransitionType } from '../types';
 import WizardStepWrapper from './WizardStepWrapper';
 
@@ -8,6 +8,8 @@ interface PreviewStepProps {
   selectedMusic: MusicTrack | null;
   backgroundImage: BackgroundImage | null;
   selectedTransition: TransitionType;
+  slideDuration: number;
+  onSlideDurationChange: (duration: number) => void;
   onGenerate: () => void;
   onEdit: (step: number) => void;
 }
@@ -17,6 +19,8 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
   selectedMusic,
   backgroundImage,
   selectedTransition,
+  slideDuration,
+  onSlideDurationChange,
   onGenerate,
   onEdit
 }) => {
@@ -28,6 +32,10 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
     return Object.entries(classData).filter(([_, photos]) => photos.length > 0);
   };
 
+  const getTotalDuration = () => {
+    return Math.round((getTotalPhotos() * slideDuration) / 60 * 10) / 10; // Convert to minutes, round to 1 decimal
+  };
+
   return (
     <WizardStepWrapper
       title="Review Your Slideshow"
@@ -35,7 +43,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
     >
       <div className="space-y-8">
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
             <div className="flex items-center space-x-2 mb-2">
               <Camera className="h-5 w-5 text-blue-600" />
@@ -77,6 +85,60 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
               {selectedTransition.name}
             </div>
           </div>
+
+          <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+            <div className="flex items-center space-x-2 mb-2">
+              <Clock className="h-5 w-5 text-green-600" />
+              <span className="font-medium text-green-900">Duration</span>
+            </div>
+            <div className="text-sm font-semibold text-green-600">
+              {slideDuration}s per slide
+            </div>
+            <div className="text-sm text-green-700">
+              ~{getTotalDuration()} min total
+            </div>
+          </div>
+        </div>
+
+        {/* Slide Duration Setting */}
+        <div className="bg-white border rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Slide Duration</h3>
+              <p className="text-sm text-gray-600">How long each photo is displayed</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-6">
+            <div className="flex-1">
+              <input
+                type="range"
+                min="1"
+                max="10"
+                step="0.5"
+                value={slideDuration}
+                onChange={(e) => onSlideDurationChange(parseFloat(e.target.value))}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>1s</span>
+                <span>3s</span>
+                <span>5s</span>
+                <span>10s</span>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-gray-900">{slideDuration}s</div>
+              <div className="text-sm text-gray-500">per slide</div>
+            </div>
+          </div>
+          
+          <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Total slideshow duration:</span>
+              <span className="font-medium text-gray-900">~{getTotalDuration()} minutes</span>
+            </div>
+          </div>
         </div>
 
         {/* Class Photos Preview */}
@@ -111,7 +173,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
         </div>
 
         {/* Settings Preview */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-white border rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-gray-900">Music Selection</h4>
@@ -154,6 +216,13 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
             </div>
             <p className="text-sm text-gray-600">{selectedTransition.name}</p>
           </div>
+
+          <div className="bg-white border rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="font-medium text-gray-900">Slide Duration</h4>
+            </div>
+            <p className="text-sm text-gray-600">{slideDuration} seconds per slide</p>
+          </div>
         </div>
 
         {/* Generate Button */}
@@ -166,7 +235,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
             Generate Slideshow Video
           </button>
           <p className="text-sm text-gray-500 mt-2">
-            This will create a high-quality 1080p video with all your selected settings
+            This will create a high-quality 1080p video (~{getTotalDuration()} minutes) with all your selected settings
           </p>
         </div>
       </div>

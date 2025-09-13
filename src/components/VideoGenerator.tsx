@@ -7,6 +7,7 @@ interface VideoGeneratorProps {
   selectedMusic: MusicTrack | null;
   backgroundImage: BackgroundImage | null;
   selectedTransition: TransitionType;
+  slideDuration: number;
   onClose: () => void;
 }
 
@@ -15,6 +16,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
   selectedMusic,
   backgroundImage,
   selectedTransition,
+  slideDuration,
   onClose
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -222,7 +224,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
     }
 
     // Animation parameters
-    const photoDuration = 3000; // 3 seconds per photo for better transitions
+    const photoDuration = slideDuration * 1000; // Convert seconds to milliseconds
     const totalDuration = allPhotos.length * photoDuration;
     const fadeOutDuration = 2000; // 2 seconds fade out
     const fadeOutStartTime = totalDuration - fadeOutDuration;
@@ -413,7 +415,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
     
     const a = document.createElement('a');
     a.href = videoUrl;
-    a.download = `karate-slideshow-${new Date().toISOString().split('T')[0]}.webm`;
+    a.download = `slideshow-${new Date().toISOString().split('T')[0]}.webm`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -432,7 +434,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
           <div>
             <h2 className="text-xl font-bold text-gray-900">Enhanced Video Generator</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Transition: {selectedTransition.name} • 
+              {slideDuration}s per slide • Transition: {selectedTransition.name} • 
               {backgroundImage ? ' Custom Background' : ' Default Background'} • 
               {selectedMusic?.name || 'No Music'}
             </p>
@@ -457,7 +459,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
           {isGenerating && (
             <div className="mb-4">
               <div className="flex justify-between text-sm text-gray-600 mb-2">
-                <span>Generating enhanced video with {selectedTransition.name.toLowerCase()} transitions...</span>
+                <span>Generating video ({slideDuration}s per slide) with {selectedTransition.name.toLowerCase()} transitions...</span>
                 <span>{Math.round(progress)}%</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-3">
@@ -505,9 +507,9 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
             <h3 className="font-medium text-gray-900 mb-2">Video Features:</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
               <div>• 1920x1080 (1080p)</div>
+              <div>• {slideDuration}s per slide</div>
               <div>• {selectedTransition.name} transitions</div>
               <div>• {backgroundImage ? 'Custom' : 'Gradient'} background</div>
-              <div>• Enhanced animations</div>
             </div>
           </div>
         </div>

@@ -11,6 +11,7 @@ interface SlideshowManagerProps {
     backgroundImage: BackgroundImage | null;
     selectedTransition: TransitionType;
     classes: string[];
+    slideDuration: number;
   };
   onLoadSlideshow: (data: {
     classData: ClassData;
@@ -18,6 +19,7 @@ interface SlideshowManagerProps {
     backgroundImage: BackgroundImage | null;
     selectedTransition: TransitionType;
     classes: string[];
+    slideDuration: number;
   }) => void;
   onClose: () => void;
 }
@@ -73,7 +75,8 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
         currentSlideshow.selectedMusic,
         currentSlideshow.backgroundImage,
         currentSlideshow.selectedTransition,
-        currentSlideshow.classes
+        currentSlideshow.classes,
+        currentSlideshow.slideDuration
       );
       
       alert('Slideshow saved successfully!');
@@ -202,7 +205,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
             <div className="space-y-6">
               <div className="bg-gray-50 p-4 rounded-lg">
                 <h3 className="font-medium text-gray-900 mb-2">Current Slideshow Summary</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
                   <div>
                     <span className="text-gray-500">Photos:</span>
                     <span className="ml-2 font-medium">{getTotalPhotos()}</span>
@@ -218,6 +221,10 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
                   <div>
                     <span className="text-gray-500">Transition:</span>
                     <span className="ml-2 font-medium">{currentSlideshow.selectedTransition.name}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Duration:</span>
+                    <span className="ml-2 font-medium">{currentSlideshow.slideDuration}s/slide</span>
                   </div>
                 </div>
               </div>
