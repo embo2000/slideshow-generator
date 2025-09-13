@@ -162,7 +162,11 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
               {selectedMusic?.title || selectedMusic?.name || 'No music'}
             </div>
             <div className="text-sm text-teal-700">
-              {selectedMusic ? (selectedMusic.duration || 'Unknown duration') : 'Silent'}
+              {selectedMusic ? (
+                selectedMusic.duration && selectedMusic.duration > 0 
+                  ? `${Math.floor(selectedMusic.duration / 60)}:${(selectedMusic.duration % 60).toString().padStart(2, '0')}`
+                  : 'Loading duration...'
+              ) : 'Silent'}
             </div>
           </div>
 
@@ -288,6 +292,11 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
             <p className="text-sm text-gray-600">
               {selectedMusic?.title || selectedMusic?.name || 'No music selected'}
             </p>
+            {selectedMusic && selectedMusic.duration > 0 && (
+              <p className="text-xs text-gray-500 mt-1">
+                Duration: {Math.floor(selectedMusic.duration / 60)}:{(selectedMusic.duration % 60).toString().padStart(2, '0')}
+              </p>
+            )}
           </div>
 
           <div className="bg-white border rounded-lg p-4">

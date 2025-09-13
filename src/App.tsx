@@ -195,15 +195,37 @@ const getTotalPhotos = () => {
     createdTime: string;
     size?: string;
   }) => {
-    setSelectedMusic({
-      id: musicData.id,
-      name: musicData.name,
-      title: musicData.name,
-      artist: 'Your Music',
-      duration: 0,
-      url: musicData.url,
-      assetId: musicData.id
+    // Create audio element to get duration
+    const audio = new Audio(musicData.url);
+    audio.addEventListener('loadedmetadata', () => {
+      const durationInSeconds = Math.round(audio.duration);
+      setSelectedMusic({
+        id: musicData.id,
+        name: musicData.name,
+        title: musicData.name,
+        artist: 'Your Music',
+        duration: durationInSeconds,
+        url: musicData.url,
+        assetId: musicData.id
+      });
     });
+    
+    audio.addEventListener('error', () => {
+      console.error('Failed to load audio metadata for:', musicData.name);
+      // Set music without duration if metadata loading fails
+      setSelectedMusic({
+        id: musicData.id,
+        name: musicData.name,
+        title: musicData.name,
+        artist: 'Your Music',
+        duration: 0,
+        url: musicData.url,
+        assetId: musicData.id
+      });
+    });
+    
+    // Load the audio to trigger metadata loading
+    audio.load();
   };
 
   const canProceedFromCurrentStep = () => {
