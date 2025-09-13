@@ -117,36 +117,58 @@ class GoogleDriveService {
 
     // Process background option
     let processedBackgroundOption = backgroundOption;
-    if (backgroundOption?.type === 'image' && backgroundOption.image?.file) {
+    if (backgroundOption?.type === 'image' && backgroundOption.image) {
       console.log('Processing background image');
       try {
-        // Save background image to Drive Assets folder
-        const assetId = await this.saveAssetToDrive(backgroundOption.image.file, 'image');
-        console.log('Background image saved to Drive with ID:', assetId);
-        
-        processedBackgroundOption = {
-          ...backgroundOption,
-          image: {
-            ...backgroundOption.image,
-            assetId: assetId,
-            fileName: backgroundOption.image.file.name,
-            data: await fileToBase64(backgroundOption.image.file), // Keep as fallback
-            file: undefined,
-            url: undefined
-          }
-        };
+        // Check if we have a file to save
+        if (backgroundOption.image.file) {
+          // Save background image to Drive Assets folder
+          const assetId = await this.saveAssetToDrive(backgroundOption.image.file, 'image');
+          console.log('Background image saved to Drive with ID:', assetId);
+          
+          processedBackgroundOption = {
+            ...backgroundOption,
+            image: {
+              ...backgroundOption.image,
+              assetId: assetId,
+              fileName: backgroundOption.image.file.name,
+              data: await fileToBase64(backgroundOption.image.file), // Keep as fallback
+              file: undefined,
+              url: undefined
+            }
+          };
+        } else if (backgroundOption.image.assetId) {
+          // Already saved to Drive, just keep the reference
+          console.log('Background image already saved to Drive with ID:', backgroundOption.image.assetId);
+          processedBackgroundOption = {
+            ...backgroundOption,
+            image: {
+              ...backgroundOption.image,
+              file: undefined,
+              url: undefined
+            }
+          };
+        } else {
+          // No file and no asset ID, convert to base64 fallback
+          console.log('No file or asset ID, using fallback method');
+          processedBackgroundOption = backgroundOption;
+        }
       } catch (error) {
         console.error('Failed to save background image to Drive:', error);
-        // Fallback to base64 only
-        processedBackgroundOption = {
-          ...backgroundOption,
-          image: {
-            ...backgroundOption.image,
-            data: await fileToBase64(backgroundOption.image.file),
-            file: undefined,
-            url: undefined
-          }
-        };
+        // Fallback to base64 only if we have a file
+        if (backgroundOption.image.file) {
+          processedBackgroundOption = {
+            ...backgroundOption,
+            image: {
+              ...backgroundOption.image,
+              data: await fileToBase64(backgroundOption.image.file),
+              file: undefined,
+              url: undefined
+            }
+          };
+        } else {
+          processedBackgroundOption = backgroundOption;
+        }
       }
     }
 
