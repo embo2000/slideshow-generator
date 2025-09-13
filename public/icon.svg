@@ -1,0 +1,58 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1d4ed8;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="slideGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.95" />
+      <stop offset="100%" style="stop-color:#f8fafc;stop-opacity:0.9" />
+    </linearGradient>
+    <linearGradient id="playGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#059669;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000000" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+  
+  <!-- Main background circle -->
+  <circle cx="256" cy="256" r="240" fill="url(#bgGradient)" filter="url(#shadow)"/>
+  
+  <!-- Slideshow frames stack -->
+  <!-- Back frame -->
+  <rect x="120" y="140" width="240" height="180" rx="12" fill="#ffffff" opacity="0.3" transform="rotate(-3 240 230)"/>
+  
+  <!-- Middle frame -->
+  <rect x="130" y="150" width="240" height="180" rx="12" fill="#ffffff" opacity="0.6" transform="rotate(2 250 240)"/>
+  
+  <!-- Front frame -->
+  <rect x="140" y="160" width="240" height="180" rx="12" fill="url(#slideGradient)" stroke="#e2e8f0" stroke-width="2" filter="url(#shadow)"/>
+  
+  <!-- Image placeholder in front frame -->
+  <rect x="160" y="180" width="200" height="120" rx="8" fill="#e2e8f0"/>
+  
+  <!-- Mountain icon in image placeholder -->
+  <path d="M180 280 L200 250 L220 270 L240 240 L260 260 L280 230 L300 250 L320 220 L340 240 L360 280 Z" fill="#94a3b8"/>
+  <circle cx="200" cy="210" r="12" fill="#fbbf24"/>
+  
+  <!-- Play button overlay -->
+  <circle cx="320" cy="300" r="32" fill="url(#playGradient)" filter="url(#shadow)"/>
+  <path d="M310 290 L310 310 L330 300 Z" fill="#ffffff"/>
+  
+  <!-- Progress dots -->
+  <circle cx="200" cy="370" r="6" fill="#3b82f6"/>
+  <circle cx="230" cy="370" r="6" fill="#cbd5e1"/>
+  <circle cx="260" cy="370" r="6" fill="#cbd5e1"/>
+  <circle cx="290" cy="370" r="6" fill="#cbd5e1"/>
+  
+  <!-- Sparkle effects -->
+  <g opacity="0.8">
+    <path d="M100 120 L105 130 L115 125 L105 135 L100 145 L95 135 L85 125 L95 130 Z" fill="#fbbf24"/>
+    <path d="M400 100 L403 106 L409 103 L403 109 L400 115 L397 109 L391 103 L397 106 Z" fill="#f59e0b"/>
+    <path d="M420 350 L424 358 L432 354 L424 362 L420 370 L416 362 L408 354 L416 358 Z" fill="#fbbf24"/>
+    <path d="M80 350 L82 354 L86 352 L82 356 L80 360 L78 356 L74 352 L78 354 Z" fill="#f59e0b"/>
+  </g>
+</svg>
