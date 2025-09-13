@@ -280,15 +280,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
         {/* Settings Preview */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-white border rounded-lg p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="font-medium text-gray-900">Music Selection</h4>
-              <button
-                onClick={() => onEdit(classes.length + 2)}
-                className="text-blue-600 hover:text-blue-700 text-sm"
-              >
-                Edit
-              </button>
-            </div>
+            <h4 className="font-medium text-gray-900 mb-2">Music Selection</h4>
             <p className="text-sm text-gray-600">
               {selectedMusic?.title || selectedMusic?.name || 'No music selected'}
             </p>
@@ -300,15 +292,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
           </div>
 
           <div className="bg-white border rounded-lg p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="font-medium text-gray-900">Background</h4>
-              <button
-                onClick={() => onEdit(classes.length + 1)}
-                className="text-blue-600 hover:text-blue-700 text-sm"
-              >
-                Edit
-              </button>
-            </div>
+            <h4 className="font-medium text-gray-900 mb-2">Background</h4>
             <p className="text-sm text-gray-600">
               {backgroundOption.type === 'image' && backgroundOption.image
                 ? `Custom image (${Math.round((backgroundOption.image.opacity || 0.8) * 100)}% opacity)`
@@ -319,22 +303,12 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
           </div>
 
           <div className="bg-white border rounded-lg p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="font-medium text-gray-900">Transitions</h4>
-              <button
-                onClick={() => onEdit(classes.length)}
-                className="text-blue-600 hover:text-blue-700 text-sm"
-              >
-                Edit
-              </button>
-            </div>
+            <h4 className="font-medium text-gray-900 mb-2">Transitions</h4>
             <p className="text-sm text-gray-600">{selectedTransition.name}</p>
           </div>
 
           <div className="bg-white border rounded-lg p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="font-medium text-gray-900">Slide Duration</h4>
-            </div>
+            <h4 className="font-medium text-gray-900 mb-2">Slide Duration</h4>
             <p className="text-sm text-gray-600">{slideDuration} seconds per slide</p>
           </div>
         </div>
