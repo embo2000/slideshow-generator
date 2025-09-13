@@ -204,6 +204,72 @@ const BackgroundStep: React.FC<BackgroundStepProps> = ({
           </div>
         )}
 
+        {/* Show existing images when Custom Image is selected but no image is loaded */}
+        {backgroundOption.type === 'image' && !backgroundOption.image && existingBackgroundImages.length > 0 && (
+          <div className="space-y-4">
+            <div className="text-center p-4 bg-blue-50 rounded-lg">
+              <FolderOpen className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+              <h3 className="font-medium text-blue-900 mb-1">Choose from Existing Images</h3>
+              <p className="text-sm text-blue-700">
+                Select a previously uploaded background image or upload a new one
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {existingBackgroundImages.map((image) => (
+                <div
+                  key={image.id}
+                  className="relative group cursor-pointer border-2 border-gray-200 hover:border-blue-500 rounded-lg overflow-hidden transition-all duration-200"
+                  onClick={() => onLoadExistingImage?.(image)}
+                >
+                  <img
+                    src={image.url}
+                    alt={image.name}
+                    className="w-full h-32 object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <div className="bg-white rounded-full p-2 shadow-lg">
+                        <ImageIcon className="h-5 w-5 text-blue-600" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-2">
+                    <p className="text-white text-xs font-medium truncate">{image.name}</p>
+                    <p className="text-white text-xs opacity-75">
+                      {new Date(image.createdTime).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="text-center">
+              <div className="inline-flex items-center text-sm text-gray-500">
+                <span>Or</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Upload new image section - show when Custom Image selected but no image loaded */}
+        {backgroundOption.type === 'image' && !backgroundOption.image && (
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+            <ImageIcon className="h-8 w-8 text-gray-400 mx-auto mb-3" />
+            <h3 className="text-sm font-medium text-gray-900 mb-2">Upload New Background Image</h3>
+            <p className="text-xs text-gray-500 mb-4">
+              Upload a new image to use as your slideshow background
+            </p>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Choose New Image
+            </button>
+          </div>
+        )}
+
         {/* Background Color Section */}
         {backgroundOption.type === 'color' && (
           <div className="space-y-4">
