@@ -38,7 +38,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
   // Auto-save when component mounts or when slideshow name changes
   useEffect(() => {
     const performAutoSave = async () => {
-      if (!onAutoSave || !slideshowName.trim()) return;
+      if (!onAutoSave || !slideshowName.trim() || getTotalPhotos() === 0) return;
       
       setIsAutoSaving(true);
       setAutoSaveStatus('saving');
@@ -46,6 +46,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
       try {
         await onAutoSave();
         setAutoSaveStatus('saved');
+        console.log('Auto-save completed successfully');
         // Reset status after 3 seconds
         setTimeout(() => setAutoSaveStatus('idle'), 3000);
       } catch (error) {
@@ -58,10 +59,15 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
       }
     };
 
-    // Debounce auto-save when slideshow name changes
-    const timeoutId = setTimeout(performAutoSave, 1000);
+    // Debounce auto-save when slideshow name changes (only if there are photos)
+    const timeoutId = setTimeout(() => {
+      if (getTotalPhotos() > 0) {
+        performAutoSave();
+      }
+    }, 2000); // Increased debounce time to 2 seconds
+    
     return () => clearTimeout(timeoutId);
-  }, [slideshowName, onAutoSave]);
+  }, [slideshowName, onAutoSave, getTotalPhotos]);
 
   const getTotalPhotos = () => {
     return Object.values(classData).reduce((total, photos) => total + photos.length, 0);

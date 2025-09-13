@@ -88,6 +88,10 @@ class GoogleDriveService {
     slideDuration: number = 3,
     slideshowName: string = ''
   ): Promise<string> {
+    console.log('Starting slideshow save process for:', name);
+    console.log('Class data keys:', Object.keys(classData));
+    console.log('Total photos:', Object.values(classData).reduce((total, photos) => total + photos.length, 0));
+    
     const token = await this.getToken();
     const folderId = await this.ensureFolder();
 
@@ -105,6 +109,7 @@ class GoogleDriveService {
 
     const processedClassData: { [className: string]: string[] } = {};
     for (const [className, files] of Object.entries(classData)) {
+      console.log(`Processing ${files.length} files for class: ${className}`);
       processedClassData[className] = await Promise.all(
         files.map((f) => fileToBase64(f))
       );
@@ -113,6 +118,7 @@ class GoogleDriveService {
     // Process background option
     let processedBackgroundOption = backgroundOption;
     if (backgroundOption.type === 'image' && backgroundOption.image?.file) {
+      console.log('Processing background image');
       processedBackgroundOption = {
         ...backgroundOption,
         image: {
@@ -137,6 +143,8 @@ class GoogleDriveService {
       slideshowName,
       settings: { classes },
     };
+
+    console.log('Slideshow data prepared, uploading to Drive...');
 
     const metadata = {
       name: `${name}.json`,
@@ -169,7 +177,13 @@ class GoogleDriveService {
       }
     );
 
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Drive API error:', res.status, errorText);
+      throw new Error(`Failed to save slideshow: ${res.status} ${errorText}`);
+    }
     const result = await res.json();
+    console.log('Slideshow saved successfully with ID:', result.id);
     return result.id;
   }
 
@@ -183,7 +197,14 @@ class GoogleDriveService {
       }
     );
 
-    return await res.json();
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Failed to load slideshow:', res.status, errorText);
+      throw new Error(`Failed to load slideshow: ${res.status}`);
+    }
+    const data = await res.json();
+    console.log('Slideshow loaded successfully:', data.name);
+    return data;
   }
 
   async listSlideshows(): Promise<DriveFile[]> {

@@ -165,63 +165,64 @@ const handleLoadSlideshow = (data: {
 
   console.log('slideshowClasses:', slideshowClasses);
   
-  // Normalize classData first
-  const normalizedClassData = normalizeLoadedClassData(data.classData);
-
-  // Ensure every class has an array (even if missing in loaded data)
-  slideshowClasses.forEach(className => {
-    if (!normalizedClassData[className]) normalizedClassData[className] = [];
-  });
-
-  // Handle background option loading
-  let loadedBackgroundOption: BackgroundOption = { type: 'none' };
-  if (data.backgroundOption) {
-    loadedBackgroundOption = data.backgroundOption;
-  } else if (data.backgroundImage) {
-    // Legacy support for old backgroundImage format
-    if (typeof data.backgroundImage === 'object' && data.backgroundImage.data) {
-      // New format with opacity
-      const blob = new Blob([Uint8Array.from(atob(data.backgroundImage.data), c => c.charCodeAt(0))], { type: 'image/jpeg' });
-      const file = new File([blob], 'background.jpg', { type: 'image/jpeg' });
-      loadedBackgroundOption = {
-        type: 'image',
-        image: {
-          file,
-          url: URL.createObjectURL(file),
-          opacity: data.backgroundImage.opacity || 0.8
-        }
-      };
-    } else if (typeof data.backgroundImage === 'string') {
-      // Legacy format without opacity
-      const blob = new Blob([Uint8Array.from(atob(data.backgroundImage), c => c.charCodeAt(0))], { type: 'image/jpeg' });
-      const file = new File([blob], 'background.jpg', { type: 'image/jpeg' });
-      loadedBackgroundOption = {
-        type: 'image',
-        image: {
-          file,
-          url: URL.createObjectURL(file),
-          opacity: 0.8
-        }
-      };
+  // Convert loaded data back to File objects
+  const processLoadedData = async () => {
+    let processedClassData: ClassData = {};
+    
+    if (data.classData) {
+      processedClassData = await convertBase64ToFiles(data.classData as { [className: string]: string[] });
     }
-  }
 
-  setClassData(normalizedClassData);
-  setSelectedMusic(data.selectedMusic ?? null);
-  setBackgroundOption(loadedBackgroundOption);
-  setSelectedTransition(data.selectedTransition ?? TRANSITION_TYPES[0]);
-  setSlideDuration(data.slideDuration ?? 3);
-  setSlideshowName(data.slideshowName ?? (() => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const month = monthNames[today.getMonth()];
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  })());
-  setClasses(slideshowClasses);
-  setCurrentStep(0);
+    // Ensure every class has an array (even if missing in loaded data)
+    slideshowClasses.forEach(className => {
+      if (!processedClassData[className]) processedClassData[className] = [];
+    });
+
+    // Handle background option loading
+    let loadedBackgroundOption: BackgroundOption = { type: 'none' };
+    if (data.backgroundOption) {
+      loadedBackgroundOption = data.backgroundOption;
+      
+      // Convert base64 background image back to File if needed
+      if (loadedBackgroundOption.type === 'image' && loadedBackgroundOption.image?.data) {
+        try {
+          const response = await fetch(`data:image/jpeg;base64,${loadedBackgroundOption.image.data}`);
+          const blob = await response.blob();
+          const file = new File([blob], 'background.jpg', { type: 'image/jpeg' });
+          loadedBackgroundOption = {
+            type: 'image',
+            image: {
+              file,
+              url: URL.createObjectURL(file),
+              opacity: loadedBackgroundOption.image.opacity || 0.8
+            }
+          };
+        } catch (error) {
+          console.error('Failed to load background image:', error);
+          loadedBackgroundOption = { type: 'none' };
+        }
+      }
+    }
+
+    setClassData(processedClassData);
+    setSelectedMusic(data.selectedMusic ?? null);
+    setBackgroundOption(loadedBackgroundOption);
+    setSelectedTransition(data.selectedTransition ?? TRANSITION_TYPES[0]);
+    setSlideDuration(data.slideDuration ?? 3);
+    setSlideshowName(data.slideshowName ?? (() => {
+      const today = new Date();
+      const year = today.getFullYear();
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                         'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const month = monthNames[today.getMonth()];
+      const day = String(today.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    })());
+    setClasses(slideshowClasses);
+    setCurrentStep(0);
+  };
+  
+  processLoadedData().catch(console.error);
 };
 
 
@@ -247,6 +248,28 @@ const normalizeLoadedClassData = (loaded: any) => {
   return normalized;
 };
   
+  // Convert File objects back to actual File objects for loaded data
+  const convertBase64ToFiles = async (classData: { [className: string]: string[] }): Promise<ClassData> => {
+    const result: ClassData = {};
+    
+    for (const [className, base64Images] of Object.entries(classData)) {
+      result[className] = await Promise.all(
+        base64Images.map(async (base64: string) => {
+          try {
+            const response = await fetch(`data:image/jpeg;base64,${base64}`);
+            const blob = await response.blob();
+            return new File([blob], `${className}-image.jpg`, { type: 'image/jpeg' });
+          } catch (error) {
+            console.error('Failed to convert base64 to file:', error);
+            // Return a placeholder or skip this image
+            return null;
+          }
+        })
+      ).then(files => files.filter(file => file !== null) as File[]);
+    }
+    
+    return result;
+  };
   const handleClassesUpdate = async (newClasses: string[]) => {
     // Update class names and migrate existing photo data
     const newClassData: ClassData = {};   
@@ -290,12 +313,13 @@ const normalizeLoadedClassData = (loaded: any) => {
   };
 
   const handleAutoSave = async () => {
-    if (!currentUser || !googleAuthService.isSignedIn() || !slideshowName.trim()) {
+    if (!currentUser || !googleAuthService.isSignedIn() || !slideshowName.trim() || getTotalPhotos() === 0) {
       return;
     }
 
     try {
-      await googleDriveService.saveSlideshow(slideshowName, 
+      await googleDriveService.saveSlideshow(
+        slideshowName, 
         classData,
         selectedMusic,
         backgroundOption,
@@ -304,6 +328,7 @@ const normalizeLoadedClassData = (loaded: any) => {
         slideDuration,
         slideshowName
       );
+      console.log('Auto-save successful for:', slideshowName);
     } catch (error) {
       console.error('Auto-save failed:', error);
     }
