@@ -159,10 +159,10 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
               <span className="font-medium text-teal-900">Music</span>
             </div>
             <div className="text-sm font-semibold text-teal-600">
-              {selectedMusic?.name || 'No music'}
+              {selectedMusic?.title || selectedMusic?.name || 'No music'}
             </div>
             <div className="text-sm text-teal-700">
-              {selectedMusic ? `${selectedMusic.duration}s` : 'Silent'}
+              {selectedMusic ? (selectedMusic.duration || 'Unknown duration') : 'Silent'}
             </div>
           </div>
 
@@ -286,7 +286,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
               </button>
             </div>
             <p className="text-sm text-gray-600">
-              {selectedMusic?.name || 'No music selected'}
+              {selectedMusic?.title || selectedMusic?.name || 'No music selected'}
             </p>
           </div>
 

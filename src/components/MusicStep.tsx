@@ -267,9 +267,10 @@ const MusicStep: React.FC<MusicStepProps> = ({
                           // Create a temporary track for preview
                           const tempTrack: MusicTrack = {
                             id: `preview-${music.id}`,
-                            name: music.name,
+                            title: music.name,
+                            artist: 'Uploaded Music',
                             url: music.url,
-                            duration: 0,
+                            duration: '0:00',
                             isCustom: true
                           };
                           togglePlay(tempTrack);
