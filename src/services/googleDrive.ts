@@ -474,18 +474,110 @@ class GoogleDriveService {
           }
         })
       );
+
+
+  private async ensureAssetsFolder(): Promise<string> {
+    const token = await this.getToken();
+    const mainFolderId = await this.ensureFolder();
+
+    // Search for Assets subfolder
+    const searchRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+        `name='Assets' and mimeType='application/vnd.google-apps.folder' and '${mainFolderId}' in parents and trashed=false`
+      )}&fields=files(id,name)`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    const searchData = await searchRes.json();
+    if (searchData.files && searchData.files.length > 0) {
+      return searchData.files[0].id;
+    }
+
+    // Create Assets subfolder if not found
+    const createRes = await fetch(`https://www.googleapis.com/drive/v3/files`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: "Assets",
+        mimeType: "application/vnd.google-apps.folder",
+        parents: [mainFolderId],
+      }),
+    });
+
+    const folder = await createRes.json();
+    return folder.id;
+  }
+
+  async saveAssetToDrive(file: File, type: 'image' | 'audio'): Promise<string> {
+    const token = await this.getToken();
+    const assetsFolderId = await this.ensureAssetsFolder();
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = `${type}-${timestamp}-${file.name}`;
+
+    const metadata = {
+      name: fileName,
+      parents: [assetsFolderId],
+      mimeType: file.type,
+    };
+
+    const boundary = "-------314159265358979323846";
+    const delimiter = `\r\n--${boundary}\r\n`;
+    const closeDelim = `\r\n--${boundary}--`;
+
+    const fileData = await file.arrayBuffer();
+
+    const body =
+      delimiter +
+      "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
+      JSON.stringify(metadata) +
+      delimiter +
+      `Content-Type: ${file.type}\r\n\r\n` +
+      new Uint8Array(fileData) +
+      closeDelim;
+
+    const res = await fetch(
+      "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": `multipart/related; boundary=${boundary}`,
+        },
+        body,
+      }
+    );
+
+    if (!res.ok) {
+      throw new Error(`Failed to save asset: ${res.status}`);
+    }
+
+    const result = await res.json();
+    return result.id;
+  }
+
+  async loadAssetFromDrive(assetId: string): Promise<string> {
+    const token = await this.getToken();
+
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${assetId}?alt=media`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    if (!res.ok) {
+      throw new Error(`Failed to load asset: ${res.status}`);
+    }
+
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  }
 }
 
-      return musicWithUrls.filter(music => music !== null) as Array<{
-        id: string;
-        name: string;
-        url: string;
-        createdTime: string;
-        size?: string;
-      }>;
-    } catch (error) {
-      console.error('Failed to list music files:', error);
-      return [];
-    }
-  }
 export const googleDriveService = new GoogleDriveService();
