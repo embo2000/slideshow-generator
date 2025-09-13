@@ -488,30 +488,45 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
         ctx.shadowBlur = 0;
         ctx.shadowOffsetY = 0;
 
-        // Enhanced class name overlay with animation
-        const overlayHeight = 140;
-        const overlayY = canvas.height - overlayHeight;
-        
-        // Animated gradient overlay
-        const overlayGradient = ctx.createLinearGradient(0, overlayY, 0, canvas.height);
-        overlayGradient.addColorStop(0, 'rgba(0, 0, 0, 0.8)');
-        overlayGradient.addColorStop(1, 'rgba(0, 0, 0, 0.9)');
-        ctx.fillStyle = overlayGradient;
-        ctx.fillRect(0, overlayY, canvas.width, overlayHeight);
-        
-        // Animated text with glow effect
-        ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
-        ctx.shadowBlur = 10;
-        ctx.fillStyle = 'white';
-        ctx.font = 'bold 42px Arial';
+        // Compact class name overlay with semi-transparent background
+        ctx.font = 'bold 32px Arial';
         ctx.textAlign = 'center';
         
-        // Static text without animation
-        ctx.fillText(currentPhoto.className, canvas.width / 2, canvas.height - 50);
+        // Measure text to create a fitted rectangle
+        const textMetrics = ctx.measureText(currentPhoto.className);
+        const textWidth = textMetrics.width;
+        const textHeight = 32; // Font size
+        
+        // Calculate rectangle dimensions with padding
+        const padding = 20;
+        const rectWidth = textWidth + (padding * 2);
+        const rectHeight = textHeight + (padding * 1.5);
+        
+        // Position rectangle at bottom center
+        const rectX = (canvas.width - rectWidth) / 2;
+        const rectY = canvas.height - rectHeight - 30; // 30px from bottom
+        
+        // Draw semi-transparent rounded rectangle
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; // 50% opacity black
+        ctx.beginPath();
+        ctx.roundRect(rectX, rectY, rectWidth, rectHeight, 8);
+        ctx.fill();
+        
+        // Draw text with subtle glow
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetY = 1;
+        ctx.fillStyle = 'white';
+        
+        // Center text in rectangle
+        const textX = canvas.width / 2;
+        const textY = rectY + (rectHeight / 2) + (textHeight / 3); // Vertically center
+        ctx.fillText(currentPhoto.className, textX, textY);
         
         // Reset text shadow
         ctx.shadowColor = 'transparent';
         ctx.shadowBlur = 0;
+        ctx.shadowOffsetY = 0;
 
         // Enhanced progress indicator with animation
         const progressBarWidth = canvas.width * 0.6;
