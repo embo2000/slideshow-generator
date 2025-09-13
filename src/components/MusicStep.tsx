@@ -109,32 +109,7 @@ const MusicStep: React.FC<MusicStepProps> = ({
       alert('Please select a valid audio file (MP3, WAV, OGG, etc.)');
     }
   };
-  return (
-    <WizardStepWrapper
-      title="Select Background Music"
-      description="Choose music to accompany your slideshow"
-    >
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {tracks.map((track) => (
-            <div
-              key={track.id}
-              className={`p-6 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
-                selectedTrack?.id === track.id
-                  ? 'border-orange-500 bg-orange-50 shadow-md'
-                  : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-              }`}
-              onClick={() => onSelectTrack(track)}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center space-x-3">
-                  <div className={`p-2 rounded-lg ${
-                    selectedTrack?.id === track.id
-                      ? 'bg-orange-100 text-orange-600'
-                      : 'bg-gray-100 text-gray-600'
-                  }`}>
-                    <Music className="h-5 w-5" />
-                  </div>
+
   const removeCustomTrack = (trackId: string) => {
     const track = customTracks.find(t => t.id === trackId);
     if (track?.file) {
@@ -158,13 +133,120 @@ const MusicStep: React.FC<MusicStepProps> = ({
       onSelectTrack(tracks[0] || null);
     }
   };
+
+  const handleUrlAdd = () => {
+    if (!audioUrl.trim() || !audioName.trim()) {
+      alert('Please enter both a name and URL for the audio');
+      return;
+    }
+
+    const audio = new Audio(audioUrl);
+    
+    audio.addEventListener('loadedmetadata', () => {
+      const newTrack: MusicTrack = {
+        id: `custom-url-${Date.now()}`,
+        name: audioName,
+        url: audioUrl,
+        duration: Math.round(audio.duration),
+        isCustom: true
+      };
+      
+      setCustomTracks(prev => [...prev, newTrack]);
+      onSelectTrack(newTrack);
+      setAudioUrl('');
+      setAudioName('');
+      setShowAddOptions(false);
+    });
+    
+    audio.addEventListener('error', () => {
+      alert('Failed to load audio from URL. Please check the URL and try again.');
+    });
+  };
+
+  return (
+    <WizardStepWrapper
+      title="Select Background Music"
+      description="Choose music to accompany your slideshow"
+    >
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {allTracks.map((track) => (
+            <div
+              key={track.id}
+              className={`p-6 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                selectedTrack?.id === track.id
+                  ? 'border-orange-500 bg-orange-50 shadow-md'
+                  : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+              }`}
+              onClick={() => onSelectTrack(track)}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-3">
+                  <div className={`p-2 rounded-lg ${
+                    selectedTrack?.id === track.id
+                      ? 'bg-orange-100 text-orange-600'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    <Music className="h-5 w-5" />
+                  </div>
                   <div>
                     <h3 className="font-semibold text-gray-900">{track.name}</h3>
-                    {weeklyTrack?.id === track.id && (
+                    {track.isCustom ? (
+                      <span className="text-xs text-blue-600 font-medium">Custom Audio</span>
+                    ) : weeklyTrack?.id === track.id && (
                       <div className="flex items-center space-x-1 mt-1">
                         <Star className="h-3 w-3 text-orange-500 fill-current" />
                         <span className="text-xs text-orange-600 font-medium">Recommended</span>
                       </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      togglePlay(track);
+                    }}
+                    className="p-2 hover:bg-white rounded-full transition-colors"
+                  >
+                    {playingTrack === track.id ? (
+                      <Pause className="h-5 w-5 text-orange-600" />
+                    ) : (
+                      <Play className="h-5 w-5 text-gray-600" />
+                    )}
+                  </button>
+                  {track.isCustom && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeCustomTrack(track.id);
+                      }}
+                      className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-2 text-sm text-gray-500">
+                <Volume2 className="h-4 w-4" />
+                <span>{track.duration ? `${track.duration}s` : 'Loading...'}</span>
+              </div>
+              
+              {selectedTrack?.id === track.id && (
+                <div className="mt-3 text-sm font-medium text-orange-600">
+                  ✓ Selected
+                  {selectedTrack.isCustom 
+                    ? ' (Custom Audio)' 
+                    : weeklyTrack?.id === selectedTrack.id && ' (Recommended this week)'
+                  }
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
         {/* Add Custom Audio Section */}
         <div className="bg-gray-50 p-4 rounded-lg">
           <div className="flex items-center justify-between mb-4">
@@ -240,95 +322,9 @@ const MusicStep: React.FC<MusicStepProps> = ({
             </div>
           )}
         </div>
-                    )}
-                  </div>
-          {allTracks.map((track) => (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    togglePlay(track);
-                  }}
-                  className="p-2 hover:bg-white rounded-full transition-colors"
-                >
-                  {playingTrack === track.id ? (
-                    <Pause className="h-5 w-5 text-orange-600" />
-                  ) : (
-                    <Play className="h-5 w-5 text-gray-600" />
-                  )}
-                </button>
-              </div>
-              
-              <div className="flex items-center space-x-2 text-sm text-gray-500">
-                <Volume2 className="h-4 w-4" />
-                <span>{track.duration}s</span>
-              </div>
-              
-                    {track.isCustom ? (
-                      <span className="text-xs text-blue-600 font-medium">Custom Audio</span>
-                    ) : weeklyTrack?.id === track.id && (
-                <div className="mt-3 text-sm font-medium text-orange-600">
-                  ✓ Selected
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      togglePlay(track);
-                    }}
-                    className="p-2 hover:bg-white rounded-full transition-colors"
-                  >
-                    {playingTrack === track.id ? (
-                      <Pause className="h-5 w-5 text-orange-600" />
-                    ) : (
-                      <Play className="h-5 w-5 text-gray-600" />
-                    )}
-                  </button>
-                  {track.isCustom && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeCustomTrack(track.id);
-                      }}
-                      className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
+      </div>
+    </WizardStepWrapper>
+  );
+};
 
-  const handleUrlAdd = () => {
-    if (!audioUrl.trim() || !audioName.trim()) {
-      alert('Please enter both a name and URL for the audio');
-                <span>{track.duration ? `${track.duration}s` : 'Loading...'}</span>
-    }
-
-    const audio = new Audio(audioUrl);
-    
-    audio.addEventListener('loadedmetadata', () => {
-      const newTrack: MusicTrack = {
-        id: `custom-url-${Date.now()}`,
-        name: audioName,
-        url: audioUrl,
-        duration: Math.round(audio.duration),
-        isCustom: true
-      };
-      
-      setCustomTracks(prev => [...prev, newTrack]);
-      onSelectTrack(newTrack);
-              {selectedTrack.isCustom 
-                ? ' (Custom Audio)' 
-                : weeklyTrack?.id === selectedTrack.id && ' (Recommended this week)'
-              }
-      setAudioName('');
-      setShowAddOptions(false);
-    });
-    
-    audio.addEventListener('error', () => {
-      alert('Failed to load audio from URL. Please check the URL and try again.');
-    });
-  };
 export default MusicStep;
