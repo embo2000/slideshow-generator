@@ -449,7 +449,7 @@ class GoogleDriveService {
       const res = await fetch(
         `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
           `'${assetsFolderId}' in parents and mimeType contains 'image/' and trashed=false`
-        )}&fields=files(id,name,createdTime)&orderBy=createdTime desc`,
+        )}&fields=files(id,name,description,createdTime)&orderBy=createdTime desc`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -467,9 +467,19 @@ class GoogleDriveService {
         images.map(async (image: any) => {
           try {
             const url = await this.loadAssetFromDrive(image.id);
+            // Use description (original filename) if available, otherwise extract from Drive filename
+            let displayName = image.description || image.name;
+            if (!image.description && image.name.includes('-')) {
+              // Extract original filename from Drive filename pattern: type-timestamp-originalname
+              const parts = image.name.split('-');
+              if (parts.length >= 3) {
+                displayName = parts.slice(2).join('-'); // Rejoin in case original name had dashes
+              }
+            }
+            
             return {
               id: image.id,
-              name: image.name,
+              name: displayName,
               url,
               createdTime: image.createdTime
             };
@@ -506,7 +516,7 @@ class GoogleDriveService {
       const res = await fetch(
         `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
           `'${assetsFolderId}' in parents and mimeType contains 'audio/' and trashed=false`
-        )}&fields=files(id,name,createdTime,size)&orderBy=createdTime desc`,
+        )}&fields=files(id,name,description,createdTime,size)&orderBy=createdTime desc`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -524,9 +534,19 @@ class GoogleDriveService {
         musicFiles.map(async (music: any) => {
           try {
             const url = await this.loadAssetFromDrive(music.id);
+            // Use description (original filename) if available, otherwise extract from Drive filename
+            let displayName = music.description || music.name;
+            if (!music.description && music.name.includes('-')) {
+              // Extract original filename from Drive filename pattern: type-timestamp-originalname
+              const parts = music.name.split('-');
+              if (parts.length >= 3) {
+                displayName = parts.slice(2).join('-'); // Rejoin in case original name had dashes
+              }
+            }
+            
             return {
               id: music.id,
-              name: music.name,
+              name: displayName,
               url,
               createdTime: music.createdTime,
               size: music.size
@@ -591,12 +611,13 @@ class GoogleDriveService {
     const assetsFolderId = await this.ensureAssetsFolder();
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const fileName = `${type}-${timestamp}-${file.name}`;
+    const driveFileName = `${type}-${timestamp}-${file.name}`;
 
     const metadata = {
-      name: fileName,
+      name: driveFileName,
       parents: [assetsFolderId],
       mimeType: file.type,
+      description: file.name, // Store original filename in description
     };
 
     const form = new FormData();
