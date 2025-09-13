@@ -3,6 +3,8 @@ export interface MusicTrack {
   name: string;
   url: string;
   duration: number;
+  isCustom?: boolean;
+  file?: File;
 }
 
 export interface ClassData {
