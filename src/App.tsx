@@ -311,6 +311,7 @@ const normalizeLoadedClassData = (loaded: any) => {
           onEdit={handleEditStep}
           slideshowName={slideshowName}
           onSlideshowNameChange={setSlideshowName}
+          onAutoSave={handleAutoSave}
         />
       );
     }
