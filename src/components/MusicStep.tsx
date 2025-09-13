@@ -24,6 +24,9 @@ const MusicStep: React.FC<MusicStepProps> = ({
   const [audioName, setAudioName] = useState('');
   const [editingTrack, setEditingTrack] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingFileName, setPendingFileName] = useState('');
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const allTracks = [...tracks, ...customTracks];
@@ -85,31 +88,60 @@ const MusicStep: React.FC<MusicStepProps> = ({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && file.type.startsWith('audio/')) {
-      const url = URL.createObjectURL(file);
-      const audio = new Audio(url);
-      
-      audio.addEventListener('loadedmetadata', () => {
-        const newTrack: MusicTrack = {
-          id: `custom-${Date.now()}`,
-          name: file.name.replace(/\.[^/.]+$/, ''), // Remove file extension
-          url: url,
-          duration: Math.round(audio.duration),
-          isCustom: true,
-          file: file
-        };
-        
-        setCustomTracks(prev => [...prev, newTrack]);
-        onSelectTrack(newTrack);
-        setShowAddOptions(false);
-      });
-      
-      audio.addEventListener('error', () => {
-        alert('Failed to load audio file. Please try a different file.');
-        URL.revokeObjectURL(url);
-      });
+      // Show rename dialog
+      setPendingFile(file);
+      setPendingFileName(file.name.replace(/\.[^/.]+$/, '')); // Remove file extension
+      setShowRenameDialog(true);
     } else {
       alert('Please select a valid audio file (MP3, WAV, OGG, etc.)');
     }
+    
+    // Reset file input
+    if (e.target) {
+      e.target.value = '';
+    }
+  };
+
+  const confirmFileUpload = () => {
+    if (!pendingFile || !pendingFileName.trim()) return;
+    
+    const url = URL.createObjectURL(pendingFile);
+    const audio = new Audio(url);
+    
+    audio.addEventListener('loadedmetadata', () => {
+      const newTrack: MusicTrack = {
+        id: `custom-${Date.now()}`,
+        name: pendingFileName.trim(),
+        url: url,
+        duration: Math.round(audio.duration),
+        isCustom: true,
+        file: pendingFile
+      };
+      
+      setCustomTracks(prev => [...prev, newTrack]);
+      onSelectTrack(newTrack);
+      setShowAddOptions(false);
+      setShowRenameDialog(false);
+      setPendingFile(null);
+      setPendingFileName('');
+    });
+    
+    audio.addEventListener('error', () => {
+      alert('Failed to load audio file. Please try a different file.');
+      URL.revokeObjectURL(url);
+      setShowRenameDialog(false);
+      setPendingFile(null);
+      setPendingFileName('');
+    });
+  };
+
+  const cancelFileUpload = () => {
+    if (pendingFile) {
+      // Clean up if we created an object URL
+      setPendingFile(null);
+    }
+    setPendingFileName('');
+    setShowRenameDialog(false);
   };
 
   const removeCustomTrack = (trackId: string) => {
@@ -320,6 +352,54 @@ const MusicStep: React.FC<MusicStepProps> = ({
           )}
         </div>
       </div>
+
+      {/* Rename Dialog */}
+      {showRenameDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Name Your Audio Track</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Track Name
+                  </label>
+                  <input
+                    type="text"
+                    value={pendingFileName}
+                    onChange={(e) => setPendingFileName(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        confirmFileUpload();
+                      } else if (e.key === 'Escape') {
+                        cancelFileUpload();
+                      }
+                    }}
+                    placeholder="Enter a name for this track..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    autoFocus
+                  />
+                </div>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    onClick={cancelFileUpload}
+                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg font-medium transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmFileUpload}
+                    disabled={!pendingFileName.trim()}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-lg font-medium transition-colors"
+                  >
+                    Add Track
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </WizardStepWrapper>
   );
 };
