@@ -224,6 +224,8 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
     // Animation parameters
     const photoDuration = 3000; // 3 seconds per photo for better transitions
     const totalDuration = allPhotos.length * photoDuration;
+    const fadeOutDuration = 2000; // 2 seconds fade out
+    const fadeOutStartTime = totalDuration - fadeOutDuration;
     const startTime = Date.now();
     
     // Preload all images
@@ -242,6 +244,12 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
       const progress = Math.min(elapsed / totalDuration, 1);
       setProgress(progress * 100);
 
+      // Handle music fade out
+      if (backgroundAudio && elapsed >= fadeOutStartTime) {
+        const fadeProgress = (elapsed - fadeOutStartTime) / fadeOutDuration;
+        const volume = Math.max(0, 0.3 * (1 - fadeProgress)); // Fade from 0.3 to 0
+        backgroundAudio.volume = volume;
+      }
       if (progress >= 1) {
         mediaRecorder.stop();
         return;
