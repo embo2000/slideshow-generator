@@ -85,6 +85,7 @@ function App() {
     createdTime: string;
     size?: string;
   }>>([]);
+  const [customMusicTracks, setCustomMusicTracks] = useState<MusicTrack[]>([]);
 
   // Load groups settings when user signs in
   useEffect(() => {
@@ -524,6 +525,8 @@ const normalizeLoadedClassData = (loaded: any) => {
           onSelectTrack={setSelectedMusic}
           existingMusicFiles={existingMusicFiles}
           onLoadExistingMusic={handleLoadExistingMusic}
+          customTracks={customMusicTracks}
+          onCustomTracksUpdate={setCustomMusicTracks}
         />
       );
     } else if (currentStep === classes.length + 3) {

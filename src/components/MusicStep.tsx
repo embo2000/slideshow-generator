@@ -16,6 +16,8 @@ interface MusicStepProps {
     size?: string;
   }>;
   onLoadExistingMusic?: (musicData: { id: string; url: string; name: string }) => void;
+  customTracks?: MusicTrack[];
+  onCustomTracksUpdate?: (tracks: MusicTrack[]) => void;
 }
 
 const MusicStep: React.FC<MusicStepProps> = ({
@@ -24,11 +26,12 @@ const MusicStep: React.FC<MusicStepProps> = ({
   weeklyTrack,
   onSelectTrack,
   existingMusicFiles = [],
-  onLoadExistingMusic
+  onLoadExistingMusic,
+  customTracks = [],
+  onCustomTracksUpdate
 }) => {
   const [playingTrack, setPlayingTrack] = useState<string | null>(null);
   const [audioRefs] = useState<{ [key: string]: HTMLAudioElement }>({});
-  const [customTracks, setCustomTracks] = useState<MusicTrack[]>([]);
   const [showAddOptions, setShowAddOptions] = useState(false);
   const [audioUrl, setAudioUrl] = useState('');
   const [audioName, setAudioName] = useState('');
@@ -128,7 +131,7 @@ const MusicStep: React.FC<MusicStepProps> = ({
         file: pendingFile
       };
       
-      setCustomTracks(prev => [...prev, newTrack]);
+      onCustomTracksUpdate?.([...customTracks, newTrack]);
       onSelectTrack(newTrack);
       setShowAddOptions(false);
       setShowRenameDialog(false);
@@ -170,7 +173,7 @@ const MusicStep: React.FC<MusicStepProps> = ({
     }
     
     // Remove from custom tracks
-    setCustomTracks(prev => prev.filter(t => t.id !== trackId));
+    onCustomTracksUpdate?.(customTracks.filter(t => t.id !== trackId));
     
     // If this was the selected track, clear selection
     if (selectedTrack?.id === trackId) {
@@ -195,7 +198,7 @@ const MusicStep: React.FC<MusicStepProps> = ({
         isCustom: true
       };
       
-      setCustomTracks(prev => [...prev, newTrack]);
+      onCustomTracksUpdate?.([...customTracks, newTrack]);
       onSelectTrack(newTrack);
       setAudioUrl('');
       setAudioName('');
