@@ -276,6 +276,26 @@ const normalizeLoadedClassData = (loaded: any) => {
     setCurrentStep(stepIndex);
   };
 
+  const handleAutoSave = async () => {
+    if (!currentUser || !googleAuthService.isSignedIn() || !slideshowName.trim()) {
+      return;
+    }
+
+    try {
+      await googleDriveService.saveSlideshow(slideshowName, {
+        classData,
+        selectedMusic,
+        backgroundImage,
+        selectedTransition,
+        classes,
+        slideDuration,
+        slideshowName,
+      });
+    } catch (error) {
+      console.error('Auto-save failed:', error);
+    }
+  };
+
   const generateVideo = () => {
     if (getTotalPhotos() === 0) return;
     setShowVideoGenerator(true);
