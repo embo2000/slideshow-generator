@@ -144,7 +144,10 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="bg-cyan-50 p-4 rounded-lg border border-cyan-200">
+          <div 
+            className="bg-cyan-50 p-4 rounded-lg border border-cyan-200 cursor-pointer hover:bg-cyan-100 transition-colors"
+            onClick={() => onEdit(0)}
+          >
             <div className="flex items-center space-x-2 mb-2">
               <Camera className="h-5 w-5 text-cyan-600" />
               <span className="font-medium text-cyan-900">Photos</span>
@@ -153,7 +156,10 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
             <div className="text-sm text-cyan-700">{getClassesWithPhotos().length} groups</div>
           </div>
 
-          <div className="bg-teal-50 p-4 rounded-lg border border-teal-200">
+          <div 
+            className="bg-teal-50 p-4 rounded-lg border border-teal-200 cursor-pointer hover:bg-teal-100 transition-colors"
+            onClick={() => onEdit(classes.length + 2)}
+          >
             <div className="flex items-center space-x-2 mb-2">
               <Music className="h-5 w-5 text-teal-600" />
               <span className="font-medium text-teal-900">Music</span>
@@ -170,7 +176,10 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
             </div>
           </div>
 
-          <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
+          <div 
+            className="bg-emerald-50 p-4 rounded-lg border border-emerald-200 cursor-pointer hover:bg-emerald-100 transition-colors"
+            onClick={() => onEdit(classes.length + 1)}
+          >
             <div className="flex items-center space-x-2 mb-2">
               <ImageIcon className="h-5 w-5 text-emerald-600" />
               <span className="font-medium text-emerald-900">Background</span>
@@ -181,7 +190,10 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
             </div>
           </div>
 
-          <div className="bg-cyan-50 p-4 rounded-lg border border-cyan-200">
+          <div 
+            className="bg-cyan-50 p-4 rounded-lg border border-cyan-200 cursor-pointer hover:bg-cyan-100 transition-colors"
+            onClick={() => onEdit(classes.length)}
+          >
             <div className="flex items-center space-x-2 mb-2">
               <Zap className="h-5 w-5 text-cyan-600" />
               <span className="font-medium text-cyan-900">Transitions</span>
