@@ -251,10 +251,32 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
 
     // Load background music if selected
     let backgroundAudio: HTMLAudioElement | null = null;
+    let audioContext: AudioContext | null = null;
+    let audioSource: MediaElementAudioSourceNode | null = null;
+    let gainNode: GainNode | null = null;
+    let destination: MediaStreamAudioDestinationNode | null = null;
+    
     if (selectedMusic) {
       backgroundAudio = new Audio(selectedMusic.url);
       backgroundAudio.volume = 0.3; // Lower volume for background
       backgroundAudio.loop = true;
+      backgroundAudio.crossOrigin = "anonymous"; // Enable CORS for audio processing
+      
+      // Set up audio context for proper stream mixing
+      try {
+        audioContext = new AudioContext();
+        audioSource = audioContext.createMediaElementSource(backgroundAudio);
+        gainNode = audioContext.createGain();
+        gainNode.gain.value = 0.3; // Set volume
+        destination = audioContext.createMediaStreamDestination();
+        
+        audioSource.connect(gainNode);
+        gainNode.connect(destination);
+        gainNode.connect(audioContext.destination); // Also connect to speakers for monitoring
+      } catch (error) {
+        console.warn('Audio context setup failed:', error);
+        audioContext = null;
+      }
     }
 
     // Load background image if provided
@@ -283,25 +305,18 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
     // Create video recorder
     let combinedStream: MediaStream;
     
-    if (backgroundAudio) {
-      // Create audio context for mixing
-      const audioContext = new AudioContext();
-      const audioSource = audioContext.createMediaElementSource(backgroundAudio);
-      const gainNode = audioContext.createGain();
-      gainNode.gain.value = 0.3; // Set volume
-      
-      const destination = audioContext.createMediaStreamDestination();
-      audioSource.connect(gainNode);
-      gainNode.connect(destination);
-      
+    if (backgroundAudio && audioContext && destination) {
       // Combine video and audio streams
       const videoStream = canvas.captureStream(30);
       combinedStream = new MediaStream([
         ...videoStream.getVideoTracks(),
         ...destination.stream.getAudioTracks()
       ]);
+      
+      console.log('Combined stream created with audio tracks:', destination.stream.getAudioTracks().length);
     } else {
       combinedStream = canvas.captureStream(30);
+      console.log('Video-only stream created');
     }
     
     const mediaRecorder = new MediaRecorder(combinedStream, {
@@ -326,6 +341,11 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
         backgroundAudio.pause();
         backgroundAudio.currentTime = 0;
       }
+      
+      // Clean up audio context
+      if (audioContext) {
+        audioContext.close();
+      }
     };
 
     // Start recording
@@ -333,11 +353,17 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
     
     // Start background music
     if (backgroundAudio) {
-      // Ensure audio context is resumed (required by some browsers)
-      if (backgroundAudio.paused) {
-        backgroundAudio.play().catch(error => {
-          console.warn('Background music failed to play:', error);
-        });
+      try {
+        // Resume audio context if suspended (required by some browsers)
+        if (audioContext && audioContext.state === 'suspended') {
+          await audioContext.resume();
+        }
+        
+        // Start playing the audio
+        await backgroundAudio.play();
+        console.log('Background music started successfully');
+      } catch (error) {
+        console.warn('Background music failed to play:', error);
       }
     }
 
@@ -368,9 +394,15 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
       // Handle music fade out
       if (backgroundAudio && elapsed >= fadeOutStartTime) {
         const fadeProgress = (elapsed - fadeOutStartTime) / fadeOutDuration;
-        const volume = Math.max(0, 0.3 * (1 - fadeProgress)); // Fade from 0.3 to 0
-        backgroundAudio.volume = volume;
+        if (gainNode) {
+          const volume = Math.max(0, 0.3 * (1 - fadeProgress)); // Fade from 0.3 to 0
+          gainNode.gain.value = volume;
+        } else {
+          const volume = Math.max(0, 0.3 * (1 - fadeProgress));
+          backgroundAudio.volume = volume;
+        }
       }
+      
       if (progress >= 1) {
         mediaRecorder.stop();
         return;
