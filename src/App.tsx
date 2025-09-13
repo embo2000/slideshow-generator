@@ -31,32 +31,7 @@ const DEFAULT_CLASSES = [
   'Image Group 5'
 ];
 
-const MUSIC_TRACKS: MusicTrack[] = [
-  {
-    id: 'sample-1',
-    name: 'Upbeat Electronic',
-    url: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
-    duration: 30
-  },
-  {
-    id: 'sample-2', 
-    name: 'Ambient Background',
-    url: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
-    duration: 27
-  },
-  {
-    id: 'sample-3',
-    name: 'Energetic Beat',
-    url: 'https://www.kozco.com/tech/piano2-CoolEdit.mp3',
-    duration: 33
-  },
-  {
-    id: 'sample-4',
-    name: 'Motivational Track',
-    url: 'https://www.learningcontainer.com/wp-content/uploads/2020/02/Kalimba.mp3',
-    duration: 30
-  }
-];
+const MUSIC_TRACKS: MusicTrack[] = [];
 
 function App() {
   const [classes, setClasses] = useState<string[]>(DEFAULT_CLASSES);
@@ -97,19 +72,9 @@ function App() {
 
   // Initialize weekly music selection
   useEffect(() => {
-    const getWeekOfYear = () => {
-      const now = new Date();
-      const start = new Date(now.getFullYear(), 0, 0);
-      const diff = now.getTime() - start.getTime();
-      const oneDay = 1000 * 60 * 60 * 24;
-      return Math.floor(diff / oneDay / 7);
-    };
-
-    const weekNumber = getWeekOfYear();
-    const musicIndex = weekNumber % MUSIC_TRACKS.length;
-    const randomTrack = MUSIC_TRACKS[musicIndex];
-    setWeeklyMusic(randomTrack);
-    setSelectedMusic(randomTrack);
+    // No default music selection since we removed sample tracks
+    setWeeklyMusic(null);
+    setSelectedMusic(null);
   }, []);
 
   const updateClassPhotos = (className: string, photos: File[]) => {
