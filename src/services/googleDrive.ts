@@ -117,14 +117,13 @@ class GoogleDriveService {
 
     // Process background option
     let processedBackgroundOption = backgroundOption;
-    if (backgroundOption.type === 'image' && backgroundOption.image?.file) {
+    if (backgroundOption?.type === 'image' && backgroundOption.image?.file) {
       console.log('Processing background image');
       processedBackgroundOption = {
         ...backgroundOption,
         image: {
           ...backgroundOption.image,
           data: await fileToBase64(backgroundOption.image.file),
-          // Remove file and url properties for storage
           file: undefined,
           url: undefined
         }
@@ -204,7 +203,6 @@ class GoogleDriveService {
     }
     const data = await res.json();
     
-    // Process loaded data to restore assets from Drive
     if (data.backgroundOption?.image?.assetId) {
       try {
         const assetUrl = await this.loadAssetFromDrive(data.backgroundOption.image.assetId);
@@ -212,7 +210,6 @@ class GoogleDriveService {
         console.log('Background image loaded from Drive');
       } catch (error) {
         console.error('Failed to load background image from Drive:', error);
-        // Fallback to base64 if available
         if (data.backgroundOption.image.data) {
           data.backgroundOption.image.url = `data:image/jpeg;base64,${data.backgroundOption.image.data}`;
         }
@@ -237,7 +234,6 @@ class GoogleDriveService {
     const token = await this.getToken();
     const folderId = await this.ensureFolder();
 
-    // Add a small delay to ensure Google Drive indexing is complete
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     const res = await fetch(
@@ -257,11 +253,9 @@ class GoogleDriveService {
     const data = await res.json();
     console.log('Drive API response:', data);
     
-    // Filter for JSON files (slideshow files)
     const jsonFiles = (data.files ?? []).filter((file: DriveFile) => {
       return file.name.endsWith('.json') && file.name !== this.settingsFileName;
-    }
-    );
+    });
     
     console.log('Filtered JSON files:', jsonFiles);
     return jsonFiles;
@@ -276,7 +270,6 @@ class GoogleDriveService {
       updatedAt: new Date().toISOString(),
     };
 
-    // Check if settings file already exists
     const searchRes = await fetch(
       `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
         `name='${this.settingsFileName}' and '${folderId}' in parents and trashed=false`
@@ -329,7 +322,6 @@ class GoogleDriveService {
       const token = await this.getToken();
       const folderId = await this.ensureFolder();
 
-      // Search for settings file
       const searchRes = await fetch(
         `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
           `name='${this.settingsFileName}' and '${folderId}' in parents and trashed=false`
@@ -343,10 +335,9 @@ class GoogleDriveService {
       const fileId = searchData.files?.[0]?.id;
 
       if (!fileId) {
-        return null; // Settings file doesn't exist
+        return null;
       }
 
-      // Load settings file content
       const res = await fetch(
         `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
         {
@@ -398,7 +389,6 @@ class GoogleDriveService {
       const data = await res.json();
       const images = data.files || [];
 
-      // Generate URLs for each image
       const imagesWithUrls = await Promise.all(
         images.map(async (image: any) => {
           try {
@@ -406,7 +396,7 @@ class GoogleDriveService {
             return {
               id: image.id,
               name: image.name,
-              url: url,
+              url,
               createdTime: image.createdTime
             };
           } catch (error) {
@@ -423,7 +413,7 @@ class GoogleDriveService {
         createdTime: string;
       }>;
     } catch (error) {
-      console.error('Failed to list music files:', error);
+      console.error('Failed to list background images:', error);
       return [];
     }
   }
@@ -456,7 +446,6 @@ class GoogleDriveService {
       const data = await res.json();
       const musicFiles = data.files || [];
 
-      // Generate URLs for each music file
       const musicWithUrls = await Promise.all(
         musicFiles.map(async (music: any) => {
           try {
@@ -464,7 +453,7 @@ class GoogleDriveService {
             return {
               id: music.id,
               name: music.name,
-              url: url,
+              url,
               createdTime: music.createdTime,
               size: music.size
             };
@@ -474,15 +463,24 @@ class GoogleDriveService {
           }
         })
       );
+
+      return musicWithUrls.filter(m => m !== null) as Array<{
+        id: string;
+        name: string;
+        url: string;
+        createdTime: string;
+        size?: string;
+      }>;
+    } catch (error) {
+      console.error('Failed to list music files:', error);
+      return [];
     }
   }
-
 
   private async ensureAssetsFolder(): Promise<string> {
     const token = await this.getToken();
     const mainFolderId = await this.ensureFolder();
 
-    // Search for Assets subfolder
     const searchRes = await fetch(
       `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
         `name='Assets' and mimeType='application/vnd.google-apps.folder' and '${mainFolderId}' in parents and trashed=false`
@@ -497,7 +495,6 @@ class GoogleDriveService {
       return searchData.files[0].id;
     }
 
-    // Create Assets subfolder if not found
     const createRes = await fetch(`https://www.googleapis.com/drive/v3/files`, {
       method: "POST",
       headers: {
@@ -528,30 +525,19 @@ class GoogleDriveService {
       mimeType: file.type,
     };
 
-    const boundary = "-------314159265358979323846";
-    const delimiter = `\r\n--${boundary}\r\n`;
-    const closeDelim = `\r\n--${boundary}--`;
-
-    const fileData = await file.arrayBuffer();
-
-    const body =
-      delimiter +
-      "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
-      JSON.stringify(metadata) +
-      delimiter +
-      `Content-Type: ${file.type}\r\n\r\n` +
-      new Uint8Array(fileData) +
-      closeDelim;
+    const form = new FormData();
+    form.append(
+      "metadata",
+      new Blob([JSON.stringify(metadata)], { type: "application/json" })
+    );
+    form.append("file", file);
 
     const res = await fetch(
       "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
       {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": `multipart/related; boundary=${boundary}`,
-        },
-        body,
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
       }
     );
 
