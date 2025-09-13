@@ -26,14 +26,14 @@ const TransitionStep: React.FC<TransitionStepProps> = ({
             onClick={() => onTransitionUpdate(transition)}
             className={`p-6 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
               selectedTransition.id === transition.id
-                ? 'border-indigo-500 bg-indigo-50 shadow-md'
+                ? 'border-cyan-500 bg-cyan-50 shadow-md'
                 : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
             }`}
           >
             <div className="flex items-start space-x-4">
               <div className={`p-3 rounded-lg ${
                 selectedTransition.id === transition.id
-                  ? 'bg-indigo-100 text-indigo-600'
+                  ? 'bg-cyan-100 text-cyan-600'
                   : 'bg-gray-100 text-gray-600'
               }`}>
                 <Zap className="h-6 w-6" />
@@ -42,7 +42,7 @@ const TransitionStep: React.FC<TransitionStepProps> = ({
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">{transition.name}</h3>
                 <p className="text-gray-600">{transition.description}</p>
                 {selectedTransition.id === transition.id && (
-                  <div className="mt-3 text-sm font-medium text-indigo-600">
+                  <div className="mt-3 text-sm font-medium text-cyan-600">
                     ✓ Selected
                   </div>
                 )}

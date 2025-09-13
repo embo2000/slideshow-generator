@@ -72,7 +72,7 @@ const BackgroundStep: React.FC<BackgroundStepProps> = ({
     } else if (type === 'color') {
       onBackgroundOptionUpdate({
         type: 'color',
-        color: { color: '#3b82f6', opacity: 0.8 }
+        color: { color: '#14b8a6', opacity: 0.8 }
       });
     } else {
       // For image, we'll wait for file upload
@@ -92,12 +92,12 @@ const BackgroundStep: React.FC<BackgroundStepProps> = ({
             onClick={() => setBackgroundType('none')}
             className={`p-4 rounded-lg border-2 transition-all ${
               backgroundOption.type === 'none'
-                ? 'border-blue-500 bg-blue-50'
+                ? 'border-teal-500 bg-teal-50'
                 : 'border-gray-200 hover:border-gray-300'
             }`}
           >
             <div className="text-center">
-              <div className="w-12 h-12 mx-auto mb-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg"></div>
+              <div className="w-12 h-12 mx-auto mb-2 bg-gradient-to-br from-cyan-500 to-teal-600 rounded-lg"></div>
               <span className="text-sm font-medium">Default Gradient</span>
             </div>
           </button>
@@ -106,7 +106,7 @@ const BackgroundStep: React.FC<BackgroundStepProps> = ({
             onClick={() => setBackgroundType('color')}
             className={`p-4 rounded-lg border-2 transition-all ${
               backgroundOption.type === 'color'
-                ? 'border-blue-500 bg-blue-50'
+                ? 'border-teal-500 bg-teal-50'
                 : 'border-gray-200 hover:border-gray-300'
             }`}
           >
@@ -120,7 +120,7 @@ const BackgroundStep: React.FC<BackgroundStepProps> = ({
             onClick={() => fileInputRef.current?.click()}
             className={`p-4 rounded-lg border-2 transition-all ${
               backgroundOption.type === 'image'
-                ? 'border-blue-500 bg-blue-50'
+                ? 'border-teal-500 bg-teal-50'
                 : 'border-gray-200 hover:border-gray-300'
             }`}
           >
@@ -177,7 +177,7 @@ const BackgroundStep: React.FC<BackgroundStepProps> = ({
                     onChange={(e) => handleImageOpacityChange(parseFloat(e.target.value))}
                     className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
                     style={{
-                      background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((backgroundOption.image.opacity || 0.8) - 0.1) / 0.9 * 100}%, #e5e7eb ${((backgroundOption.image.opacity || 0.8) - 0.1) / 0.9 * 100}%, #e5e7eb 100%)`
+                      background: `linear-gradient(to right, #14b8a6 0%, #14b8a6 ${((backgroundOption.image.opacity || 0.8) - 0.1) / 0.9 * 100}%, #e5e7eb ${((backgroundOption.image.opacity || 0.8) - 0.1) / 0.9 * 100}%, #e5e7eb 100%)`
                     }}
                   />
                   <div className="flex justify-between text-xs text-gray-500 mt-1">
@@ -208,9 +208,9 @@ const BackgroundStep: React.FC<BackgroundStepProps> = ({
         {backgroundOption.type === 'image' && !backgroundOption.image && existingBackgroundImages.length > 0 && (
           <div className="space-y-4">
             <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <FolderOpen className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-              <h3 className="font-medium text-blue-900 mb-1">Choose from Existing Images</h3>
-              <p className="text-sm text-blue-700">
+              <FolderOpen className="h-8 w-8 text-teal-600 mx-auto mb-2" />
+              <h3 className="font-medium text-teal-900 mb-1">Choose from Existing Images</h3>
+              <p className="text-sm text-teal-700">
                 Select a previously uploaded background image or upload a new one
               </p>
             </div>
@@ -219,7 +219,7 @@ const BackgroundStep: React.FC<BackgroundStepProps> = ({
               {existingBackgroundImages.map((image) => (
                 <div
                   key={image.id}
-                  className="relative group cursor-pointer border-2 border-gray-200 hover:border-blue-500 rounded-lg overflow-hidden transition-all duration-200"
+                  className="relative group cursor-pointer border-2 border-gray-200 hover:border-teal-500 rounded-lg overflow-hidden transition-all duration-200"
                   onClick={() => onLoadExistingImage?.(image)}
                 >
                   <img
@@ -230,7 +230,7 @@ const BackgroundStep: React.FC<BackgroundStepProps> = ({
                   <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                       <div className="bg-white rounded-full p-2 shadow-lg">
-                        <ImageIcon className="h-5 w-5 text-blue-600" />
+                        <ImageIcon className="h-5 w-5 text-teal-600" />
                       </div>
                     </div>
                   </div>
@@ -262,7 +262,7 @@ const BackgroundStep: React.FC<BackgroundStepProps> = ({
             </p>
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
+              className="inline-flex items-center px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium text-sm transition-colors"
             >
               <Upload className="h-4 w-4 mr-2" />
               Choose New Image
@@ -278,7 +278,7 @@ const BackgroundStep: React.FC<BackgroundStepProps> = ({
               <div 
                 className="w-full h-64 rounded-lg border shadow-sm"
                 style={{ 
-                  backgroundColor: backgroundOption.color?.color || '#3b82f6',
+                  backgroundColor: backgroundOption.color?.color || '#14b8a6',
                   opacity: backgroundOption.color?.opacity || 0.8
                 }}
               />
@@ -311,16 +311,16 @@ const BackgroundStep: React.FC<BackgroundStepProps> = ({
               <div className="flex items-center space-x-4 mb-4">
                 <input
                   type="color"
-                  value={backgroundOption.color?.color || '#3b82f6'}
+                  value={backgroundOption.color?.color || '#14b8a6'}
                   onChange={(e) => handleColorChange(e.target.value)}
                   className="w-16 h-12 rounded-lg border border-gray-300 cursor-pointer"
                 />
                 <div className="flex-1">
                   <input
                     type="text"
-                    value={backgroundOption.color?.color || '#3b82f6'}
+                    value={backgroundOption.color?.color || '#14b8a6'}
                     onChange={(e) => handleColorChange(e.target.value)}
-                    placeholder="#3b82f6"
+                    placeholder="#14b8a6"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none font-mono"
                   />
                 </div>
@@ -331,8 +331,8 @@ const BackgroundStep: React.FC<BackgroundStepProps> = ({
                 <p className="text-sm font-medium text-gray-700 mb-2">Popular Colors</p>
                 <div className="grid grid-cols-8 gap-2">
                   {[
-                    '#3b82f6', '#ef4444', '#10b981', '#f59e0b',
-                    '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16',
+                    '#14b8a6', '#06b6d4', '#10b981', '#f59e0b',
+                    '#8b5cf6', '#ec4899', '#ef4444', '#84cc16',
                     '#6b7280', '#1f2937', '#7c3aed', '#dc2626',
                     '#059669', '#d97706', '#7c2d12', '#374151'
                   ].map((color) => (
@@ -371,7 +371,7 @@ const BackgroundStep: React.FC<BackgroundStepProps> = ({
                     onChange={(e) => handleColorOpacityChange(parseFloat(e.target.value))}
                     className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
                     style={{
-                      background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((backgroundOption.color?.opacity || 0.8) - 0.1) / 0.9 * 100}%, #e5e7eb ${((backgroundOption.color?.opacity || 0.8) - 0.1) / 0.9 * 100}%, #e5e7eb 100%)`
+                      background: `linear-gradient(to right, #14b8a6 0%, #14b8a6 ${((backgroundOption.color?.opacity || 0.8) - 0.1) / 0.9 * 100}%, #e5e7eb ${((backgroundOption.color?.opacity || 0.8) - 0.1) / 0.9 * 100}%, #e5e7eb 100%)`
                     }}
                   />
                   <div className="flex justify-between text-xs text-gray-500 mt-1">
@@ -401,7 +401,7 @@ const BackgroundStep: React.FC<BackgroundStepProps> = ({
         {/* Default/None State */}
         {backgroundOption.type === 'none' && (
           <div className="text-center p-4 bg-blue-50 rounded-lg">
-            <p className="text-blue-800 text-sm">
+            <p className="text-teal-800 text-sm">
               <strong>Default gradient background selected.</strong> Choose an image or color above to customize your background.
             </p>
           </div>
