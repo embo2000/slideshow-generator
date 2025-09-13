@@ -49,9 +49,11 @@ function App() {
   const [slideshowName, setSlideshowName] = useState(() => {
     const today = new Date();
     const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = monthNames[today.getMonth()];
     const day = String(today.getDate()).padStart(2, '0');
-    return `${year}${month}${day}`;
+    return `${year}-${month}-${day}`;
   });
 
   // Load groups settings when user signs in
@@ -212,9 +214,11 @@ const handleLoadSlideshow = (data: {
   setSlideshowName(data.slideshowName ?? (() => {
     const today = new Date();
     const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = monthNames[today.getMonth()];
     const day = String(today.getDate()).padStart(2, '0');
-    return `${year}${month}${day}`;
+    return `${year}-${month}-${day}`;
   })());
   setClasses(slideshowClasses);
   setCurrentStep(0);
