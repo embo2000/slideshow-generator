@@ -343,7 +343,7 @@ const normalizeLoadedClassData = (loaded: any) => {
       />
 
       {/* Main Content */}
-      <main className="min-h-[calc(100vh-200px)]">
+      <main className="min-h-0">
         {renderCurrentStep()}
       </main>
 
