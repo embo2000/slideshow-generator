@@ -24,7 +24,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
   slideDuration,
   onSlideDurationChange,
   onGenerate,
-  onEdit
+  onEdit,
   slideshowName,
   onSlideshowNameChange
 }) => {
