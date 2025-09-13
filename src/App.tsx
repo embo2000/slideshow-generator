@@ -62,6 +62,13 @@ function App() {
     createdTime: string;
     size?: string;
   }>>([]);
+  const [existingBackgroundImages, setExistingBackgroundImages] = useState<Array<{
+    id: string;
+    name: string;
+    url: string;
+    createdTime: string;
+    size?: string;
+  }>>([]);
 
   // Load groups settings when user signs in
   useEffect(() => {
@@ -82,6 +89,10 @@ function App() {
           // Load existing music files
           const musicFiles = await googleDriveService.listMusicFiles();
           setExistingMusicFiles(musicFiles);
+          
+          // Load existing background images
+          const backgroundImages = await googleDriveService.listBackgroundImages();
+          setExistingBackgroundImages(backgroundImages);
         } catch (error) {
           console.error('Failed to load groups settings:', error);
         }
@@ -141,6 +152,40 @@ const getTotalPhotos = () => {
     completed[classes.length + 3] = getTotalPhotos() > 0; // Preview
     
     return completed;
+  };
+
+  const handleLoadExistingBackgroundImage = (imageData: {
+    id: string;
+    name: string;
+    url: string;
+    createdTime: string;
+    size?: string;
+  }) => {
+    setBackgroundOption({
+      type: 'image',
+      image: {
+        url: imageData.url,
+        opacity: 0.8,
+        assetId: imageData.id
+      }
+    });
+  };
+
+  const handleLoadExistingMusic = (musicData: {
+    id: string;
+    name: string;
+    url: string;
+    createdTime: string;
+    size?: string;
+  }) => {
+    setSelectedMusic({
+      id: musicData.id,
+      title: musicData.name,
+      artist: 'Uploaded Music',
+      duration: '0:00',
+      url: musicData.url,
+      assetId: musicData.id
+    });
   };
 
   const canProceedFromCurrentStep = () => {
