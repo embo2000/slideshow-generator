@@ -1,16 +1,25 @@
 import React, { useRef } from 'react';
-import { Upload, X, Image as ImageIcon, Palette } from 'lucide-react';
+import { Upload, X, Image as ImageIcon, Palette, FolderOpen } from 'lucide-react';
 import { BackgroundOption } from '../types';
 import WizardStepWrapper from './WizardStepWrapper';
 
 interface BackgroundStepProps {
   backgroundOption: BackgroundOption;
   onBackgroundOptionUpdate: (option: BackgroundOption) => void;
+  existingBackgroundImages?: Array<{
+    id: string;
+    name: string;
+    url: string;
+    createdTime: string;
+  }>;
+  onLoadExistingImage?: (imageData: { id: string; url: string; name: string }) => void;
 }
 
 const BackgroundStep: React.FC<BackgroundStepProps> = ({
   backgroundOption,
-  onBackgroundOptionUpdate
+  onBackgroundOptionUpdate,
+  existingBackgroundImages = [],
+  onLoadExistingImage
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
