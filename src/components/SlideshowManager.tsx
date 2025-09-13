@@ -12,6 +12,7 @@ interface SlideshowManagerProps {
     selectedTransition: TransitionType;
     classes: string[];
     slideDuration: number;
+    slideshowName: string;
   };
   onLoadSlideshow: (data: {
     classData: ClassData;
@@ -20,6 +21,7 @@ interface SlideshowManagerProps {
     selectedTransition: TransitionType;
     classes: string[];
     slideDuration: number;
+    slideshowName: string;
   }) => void;
   onClose: () => void;
 }
@@ -76,7 +78,8 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
         currentSlideshow.backgroundImage,
         currentSlideshow.selectedTransition,
         currentSlideshow.classes,
-        currentSlideshow.slideDuration
+        currentSlideshow.slideDuration,
+        currentSlideshow.slideshowName
       );
       
       alert('Slideshow saved successfully!');

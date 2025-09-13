@@ -46,6 +46,13 @@ function App() {
   const [currentUser, setCurrentUser] = useState<GoogleUser | null>(null);
   const [showSlideshowManager, setShowSlideshowManager] = useState(false);
   const [slideDuration, setSlideDuration] = useState(3); // Default 3 seconds per slide
+  const [slideshowName, setSlideshowName] = useState(() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}${month}${day}`;
+  });
 
   // Load groups settings when user signs in
   useEffect(() => {
@@ -150,6 +157,7 @@ const handleLoadSlideshow = (data: {
   selectedTransition?: TransitionType;
   classes?: string[];
   slideDuration?: number;
+  slideshowName?: string;
 }) => {
   const slideshowClasses = Array.isArray(data.classes) ? data.classes : DEFAULT_CLASSES;
 
@@ -168,6 +176,13 @@ const handleLoadSlideshow = (data: {
   setBackgroundImage(data.backgroundImage ?? null);
   setSelectedTransition(data.selectedTransition ?? TRANSITION_TYPES[0]);
   setSlideDuration(data.slideDuration ?? 3);
+  setSlideshowName(data.slideshowName ?? (() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}${month}${day}`;
+  })());
   setClasses(slideshowClasses);
   setCurrentStep(0);
 };
@@ -294,6 +309,8 @@ const normalizeLoadedClassData = (loaded: any) => {
           onSlideDurationChange={setSlideDuration}
           onGenerate={generateVideo}
           onEdit={handleEditStep}
+          slideshowName={slideshowName}
+          onSlideshowNameChange={setSlideshowName}
         />
       );
     }
@@ -381,6 +398,7 @@ const normalizeLoadedClassData = (loaded: any) => {
             selectedTransition,
             classes,
             slideDuration,
+            slideshowName,
           }}
           onLoadSlideshow={handleLoadSlideshow}
           onClose={() => setShowSlideshowManager(false)}
@@ -394,6 +412,7 @@ const normalizeLoadedClassData = (loaded: any) => {
           backgroundImage={backgroundImage}
           selectedTransition={selectedTransition}
           slideDuration={slideDuration}
+          slideshowName={slideshowName}
           onClose={() => setShowVideoGenerator(false)}
         />
       )}

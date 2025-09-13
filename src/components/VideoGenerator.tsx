@@ -8,6 +8,7 @@ interface VideoGeneratorProps {
   backgroundImage: BackgroundImage | null;
   selectedTransition: TransitionType;
   slideDuration: number;
+  slideshowName: string;
   onClose: () => void;
 }
 
@@ -17,6 +18,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
   backgroundImage,
   selectedTransition,
   slideDuration,
+  slideshowName,
   onClose
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -415,7 +417,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
     
     const a = document.createElement('a');
     a.href = videoUrl;
-    a.download = `slideshow-${new Date().toISOString().split('T')[0]}.webm`;
+    a.download = `${slideshowName || 'slideshow'}.webm`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

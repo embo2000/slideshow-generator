@@ -12,6 +12,8 @@ interface PreviewStepProps {
   onSlideDurationChange: (duration: number) => void;
   onGenerate: () => void;
   onEdit: (step: number) => void;
+  slideshowName: string;
+  onSlideshowNameChange: (name: string) => void;
 }
 
 const PreviewStep: React.FC<PreviewStepProps> = ({
@@ -23,6 +25,8 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
   onSlideDurationChange,
   onGenerate,
   onEdit
+  slideshowName,
+  onSlideshowNameChange
 }) => {
   const getTotalPhotos = () => {
     return Object.values(classData).reduce((total, photos) => total + photos.length, 0);
@@ -42,6 +46,29 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
       description="Review all your settings before generating the final video"
     >
       <div className="space-y-8">
+        {/* Slideshow Name Input */}
+        <div className="bg-white border rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Slideshow Name</h3>
+              <p className="text-sm text-gray-600">Give your slideshow a memorable name</p>
+            </div>
+          </div>
+          
+          <div className="max-w-md">
+            <input
+              type="text"
+              value={slideshowName}
+              onChange={(e) => onSlideshowNameChange(e.target.value)}
+              placeholder="Enter slideshow name..."
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-lg font-medium"
+            />
+            <p className="text-sm text-gray-500 mt-2">
+              This name will be used when saving your slideshow and for the video file
+            </p>
+          </div>
+        </div>
+
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
