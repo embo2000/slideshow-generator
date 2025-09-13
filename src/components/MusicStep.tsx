@@ -8,13 +8,23 @@ interface MusicStepProps {
   selectedTrack: MusicTrack | null;
   weeklyTrack: MusicTrack | null;
   onSelectTrack: (track: MusicTrack) => void;
+  existingMusicFiles?: Array<{
+    id: string;
+    name: string;
+    url: string;
+    createdTime: string;
+    size?: string;
+  }>;
+  onLoadExistingMusic?: (musicData: { id: string; url: string; name: string }) => void;
 }
 
 const MusicStep: React.FC<MusicStepProps> = ({
   tracks,
   selectedTrack,
   weeklyTrack,
-  onSelectTrack
+  onSelectTrack,
+  existingMusicFiles = [],
+  onLoadExistingMusic
 }) => {
   const [playingTrack, setPlayingTrack] = useState<string | null>(null);
   const [audioRefs] = useState<{ [key: string]: HTMLAudioElement }>({});
@@ -203,6 +213,85 @@ const MusicStep: React.FC<MusicStepProps> = ({
       description="Choose music to accompany your slideshow"
     >
       <div className="space-y-6">
+        {/* Existing Music Files from Google Drive */}
+        {existingMusicFiles.length > 0 && (
+          <div className="space-y-4">
+            <div className="text-center p-4 bg-blue-50 rounded-lg">
+              <Music className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+              <h3 className="font-medium text-blue-900 mb-1">Choose from Your Music Library</h3>
+              <p className="text-sm text-blue-700">
+                Select from your previously uploaded music files or add new ones below
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {existingMusicFiles.map((music) => (
+                <div
+                  key={music.id}
+                  className="p-4 rounded-lg border-2 border-gray-200 hover:border-blue-500 cursor-pointer transition-all duration-200 bg-white hover:bg-blue-50"
+                  onClick={() => onLoadExistingMusic?.(music)}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 rounded-lg bg-blue-100 text-blue-600">
+                        <Music className="h-5 w-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-900 truncate">{music.name}</h3>
+                        <div className="flex items-center space-x-2 text-xs text-gray-500 mt-1">
+                          <span>{new Date(music.createdTime).toLocaleDateString()}</span>
+                          {music.size && (
+                            <>
+                              <span>•</span>
+                              <span>{Math.round(parseInt(music.size) / 1024)} KB</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Create a temporary track for preview
+                          const tempTrack: MusicTrack = {
+                            id: `preview-${music.id}`,
+                            name: music.name,
+                            url: music.url,
+                            duration: 0,
+                            isCustom: true
+                          };
+                          togglePlay(tempTrack);
+                        }}
+                        className="p-2 hover:bg-white rounded-full transition-colors"
+                      >
+                        {playingTrack === `preview-${music.id}` ? (
+                          <Pause className="h-4 w-4 text-blue-600" />
+                        ) : (
+                          <Play className="h-4 w-4 text-gray-600" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="text-center">
+                    <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
+                      Click to use this music
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="text-center">
+              <div className="inline-flex items-center text-sm text-gray-500">
+                <span>Or add new music below</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Current/Custom Tracks */}
         {allTracks.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {allTracks.map((track) => (
@@ -269,10 +358,17 @@ const MusicStep: React.FC<MusicStepProps> = ({
             ))}
           </div>
         ) : (
-          <div className="text-center py-8 bg-gray-50 rounded-lg">
+          <div className={`text-center py-8 bg-gray-50 rounded-lg ${existingMusicFiles.length > 0 ? 'mt-6' : ''}`}>
             <Music className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Audio Files Yet</h3>
-            <p className="text-gray-500 mb-4">Upload your own audio files or add links to get started</p>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              {existingMusicFiles.length > 0 ? 'No Custom Audio Added' : 'No Audio Files Yet'}
+            </h3>
+            <p className="text-gray-500 mb-4">
+              {existingMusicFiles.length > 0 
+                ? 'Add custom audio files below or select from your library above'
+                : 'Upload your own audio files or add links to get started'
+              }
+            </p>
           </div>
         )}
 

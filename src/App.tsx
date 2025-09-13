@@ -55,6 +55,13 @@ function App() {
     const day = String(today.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   });
+  const [existingMusicFiles, setExistingMusicFiles] = useState<Array<{
+    id: string;
+    name: string;
+    url: string;
+    createdTime: string;
+    size?: string;
+  }>>([]);
 
   // Load groups settings when user signs in
   useEffect(() => {
@@ -71,6 +78,10 @@ function App() {
             });
             setClassData(newClassData);
           }
+          
+          // Load existing music files
+          const musicFiles = await googleDriveService.listMusicFiles();
+          setExistingMusicFiles(musicFiles);
         } catch (error) {
           console.error('Failed to load groups settings:', error);
         }
