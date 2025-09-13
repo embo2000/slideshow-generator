@@ -119,15 +119,60 @@ class GoogleDriveService {
     let processedBackgroundOption = backgroundOption;
     if (backgroundOption?.type === 'image' && backgroundOption.image?.file) {
       console.log('Processing background image');
-      processedBackgroundOption = {
-        ...backgroundOption,
-        image: {
-          ...backgroundOption.image,
-          data: await fileToBase64(backgroundOption.image.file),
-          file: undefined,
-          url: undefined
-        }
-      };
+      try {
+        // Save background image to Drive Assets folder
+        const assetId = await this.saveAssetToDrive(backgroundOption.image.file, 'image');
+        console.log('Background image saved to Drive with ID:', assetId);
+        
+        processedBackgroundOption = {
+          ...backgroundOption,
+          image: {
+            ...backgroundOption.image,
+            assetId: assetId,
+            fileName: backgroundOption.image.file.name,
+            data: await fileToBase64(backgroundOption.image.file), // Keep as fallback
+            file: undefined,
+            url: undefined
+          }
+        };
+      } catch (error) {
+        console.error('Failed to save background image to Drive:', error);
+        // Fallback to base64 only
+        processedBackgroundOption = {
+          ...backgroundOption,
+          image: {
+            ...backgroundOption.image,
+            data: await fileToBase64(backgroundOption.image.file),
+            file: undefined,
+            url: undefined
+          }
+        };
+      }
+    }
+
+    // Process selected music
+    let processedSelectedMusic = selectedMusic;
+    if (selectedMusic?.file) {
+      console.log('Processing background music file');
+      try {
+        // Save music file to Drive Assets folder
+        const assetId = await this.saveAssetToDrive(selectedMusic.file, 'audio');
+        console.log('Background music saved to Drive with ID:', assetId);
+        
+        processedSelectedMusic = {
+          ...selectedMusic,
+          assetId: assetId,
+          fileName: selectedMusic.file.name,
+          file: undefined // Remove file reference after saving
+        };
+      } catch (error) {
+        console.error('Failed to save background music to Drive:', error);
+        // Keep original music data as fallback
+        processedSelectedMusic = {
+          ...selectedMusic,
+          file: undefined
+        };
+      }
     }
 
     const slideshowData: SlideshowData = {
