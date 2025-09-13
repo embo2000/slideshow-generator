@@ -603,9 +603,13 @@ const normalizeLoadedClassData = (loaded: any) => {
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-teal-500 rounded-lg">
+              <button 
+                onClick={() => setCurrentStep(0)}
+                className="p-2 bg-teal-500 hover:bg-teal-600 rounded-lg transition-colors cursor-pointer"
+                title="Go to first step"
+              >
                 <Camera className="h-6 w-6 text-white" />
-              </div>
+              </button>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">Slideshow Generator</h1>
                 <p className="text-sm text-gray-500">Create beautiful photo slideshows step by step</p>
