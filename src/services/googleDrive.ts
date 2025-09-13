@@ -135,7 +135,7 @@ class GoogleDriveService {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       classData: processedClassData,
-      selectedMusic,
+      selectedMusic: processedSelectedMusic,
       backgroundOption: processedBackgroundOption,
       selectedTransition,
       slideDuration,
