@@ -231,12 +231,20 @@ const MusicStep: React.FC<MusicStepProps> = ({
               {existingMusicFiles.map((music) => (
                 <div
                   key={music.id}
-                  className="p-4 rounded-lg border-2 border-gray-200 hover:border-teal-500 cursor-pointer transition-all duration-200 bg-white hover:bg-teal-50"
+                  className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                    selectedTrack?.assetId === music.id
+                      ? 'border-teal-500 bg-teal-50 shadow-md'
+                      : 'border-gray-200 hover:border-teal-500 bg-white hover:bg-teal-50'
+                  }`}
                   onClick={() => onLoadExistingMusic?.(music)}
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-3">
-                      <div className="p-2 rounded-lg bg-teal-100 text-teal-600">
+                      <div className={`p-2 rounded-lg ${
+                        selectedTrack?.assetId === music.id
+                          ? 'bg-teal-200 text-teal-700'
+                          : 'bg-teal-100 text-teal-600'
+                      }`}>
                         <Music className="h-5 w-5" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -278,8 +286,12 @@ const MusicStep: React.FC<MusicStepProps> = ({
                   </div>
                   
                   <div className="text-center">
-                    <span className="text-xs px-2 py-1 bg-teal-100 text-teal-700 rounded-full">
-                      Click to use this music
+                    <span className={`text-xs px-2 py-1 rounded-full ${
+                      selectedTrack?.assetId === music.id
+                        ? 'bg-teal-200 text-teal-800 font-medium'
+                        : 'bg-teal-100 text-teal-700'
+                    }`}>
+                      {selectedTrack?.assetId === music.id ? '✓ Selected' : 'Click to use this music'}
                     </span>
                   </div>
                 </div>
