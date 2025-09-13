@@ -22,6 +22,8 @@ const MusicStep: React.FC<MusicStepProps> = ({
   const [showAddOptions, setShowAddOptions] = useState(false);
   const [audioUrl, setAudioUrl] = useState('');
   const [audioName, setAudioName] = useState('');
+  const [editingTrack, setEditingTrack] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const allTracks = [...tracks, ...customTracks];
