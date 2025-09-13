@@ -230,7 +230,7 @@ const MusicStep: React.FC<MusicStepProps> = ({
                 
                 {selectedTrack?.id === track.id && (
                   <div className="mt-3 text-sm font-medium text-orange-600">
-                    ✓ Selected (Custom Audio)
+                    ✓ Selected
                   </div>
                 )}
               </div>
@@ -246,7 +246,8 @@ const MusicStep: React.FC<MusicStepProps> = ({
 
         {/* Add Custom Audio Section */}
         <div className="bg-gray-50 p-4 rounded-lg">
-          <div className="flex justify-end mb-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-medium text-gray-900">Custom Audio</h3>
             <button
               onClick={() => setShowAddOptions(!showAddOptions)}
               className="inline-flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
