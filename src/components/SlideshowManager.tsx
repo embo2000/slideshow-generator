@@ -312,6 +312,63 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
               )}
             </div>
           )}
+
+          {activeTab === 'assets' && (
+            <div className="space-y-4">
+              {isLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p className="text-gray-500">Loading saved assets...</p>
+                </div>
+              ) : savedAssets.length === 0 ? (
+                <div className="text-center py-8">
+                  <Download className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500">No saved assets found</p>
+                  <p className="text-sm text-gray-400 mt-1">Background images and audio files will appear here when saved</p>
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {savedAssets.map((asset) => (
+                    <div key={asset.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2 rounded-lg bg-gray-100">
+                            {asset.mimeType?.startsWith('image/') ? (
+                              <Image className="h-5 w-5 text-blue-600" />
+                            ) : asset.mimeType?.startsWith('audio/') ? (
+                              <Music className="h-5 w-5 text-green-600" />
+                            ) : (
+                              <Download className="h-5 w-5 text-gray-600" />
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="font-medium text-gray-900">{asset.name}</h3>
+                            <div className="flex items-center space-x-4 mt-1 text-sm text-gray-500">
+                              <div className="flex items-center">
+                                <Calendar className="h-3 w-3 mr-1" />
+                                Created: {formatDate(asset.createdTime)}
+                              </div>
+                              {asset.size && (
+                                <div>
+                                  Size: {Math.round(parseInt(asset.size) / 1024)} KB
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs px-2 py-1 bg-gray-100 rounded text-gray-600">
+                            {asset.mimeType?.startsWith('image/') ? 'Image' : 
+                             asset.mimeType?.startsWith('audio/') ? 'Audio' : 'File'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

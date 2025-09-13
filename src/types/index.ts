@@ -23,6 +23,9 @@ export interface BackgroundImage {
   file: File;
   url: string;
   opacity?: number;
+  assetId?: string; // Google Drive asset ID
+  fileName?: string; // Original filename for Drive storage
+  data?: string; // Base64 fallback data
 }
 
 export interface BackgroundColor {

@@ -183,6 +183,77 @@ const handleLoadSlideshow = (data: {
     if (data.backgroundOption) {
       loadedBackgroundOption = data.backgroundOption;
       
+      // Handle background image loading (from Drive asset or base64 fallback)
+      if (loadedBackgroundOption.type === 'image' && loadedBackgroundOption.image) {
+        if (loadedBackgroundOption.image.url) {
+          // Image already loaded from Drive, just use the URL
+          console.log('Using background image from Drive');
+        } else if (loadedBackgroundOption.image.data) {
+          // Fallback to base64 data
+          loadedBackgroundOption.image.url = `data:image/jpeg;base64,${loadedBackgroundOption.image.data}`;
+          console.log('Using background image from base64 fallback');
+        }
+      }
+    }
+
+    // Handle music loading
+    let loadedSelectedMusic = data.selectedMusic;
+    if (loadedSelectedMusic?.assetId && loadedSelectedMusic.url) {
+      console.log('Using background music from Drive');
+    }
+
+    setClassData(processedClassData);
+    setSelectedMusic(loadedSelectedMusic ?? null);
+    setBackgroundOption(loadedBackgroundOption);
+    setSelectedTransition(data.selectedTransition ?? TRANSITION_TYPES[0]);
+    setSlideDuration(data.slideDuration ?? 3);
+    setSlideshowName(data.slideshowName ?? (() => {
+      const today = new Date();
+      const year = today.getFullYear();
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                         'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const month = monthNames[today.getMonth()];
+      const day = String(today.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    })());
+    setClasses(slideshowClasses);
+    setCurrentStep(0);
+  };
+  
+  processLoadedData().catch(console.error);
+};
+
+const handleLoadSlideshowOld = (data: {
+  classData?: ClassData;
+  selectedMusic?: MusicTrack | null;
+  backgroundOption?: BackgroundOption;
+  selectedTransition?: TransitionType;
+  classes?: string[];
+  slideDuration?: number;
+  slideshowName?: string;
+}) => {
+  const slideshowClasses = Array.isArray(data.classes) ? data.classes : DEFAULT_CLASSES;
+
+  console.log('slideshowClasses:', slideshowClasses);
+  
+  // Convert loaded data back to File objects
+  const processLoadedData = async () => {
+    let processedClassData: ClassData = {};
+    
+    if (data.classData) {
+      processedClassData = await convertBase64ToFiles(data.classData as { [className: string]: string[] });
+    }
+
+    // Ensure every class has an array (even if missing in loaded data)
+    slideshowClasses.forEach(className => {
+      if (!processedClassData[className]) processedClassData[className] = [];
+    });
+
+    // Handle background option loading
+    let loadedBackgroundOption: BackgroundOption = { type: 'none' };
+    if (data.backgroundOption) {
+      loadedBackgroundOption = data.backgroundOption;
+      
       // Convert base64 background image back to File if needed
       if (loadedBackgroundOption.type === 'image' && loadedBackgroundOption.image?.data) {
         try {
