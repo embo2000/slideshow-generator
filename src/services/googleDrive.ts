@@ -474,6 +474,8 @@ class GoogleDriveService {
           }
         })
       );
+    }
+  }
 
 
   private async ensureAssetsFolder(): Promise<string> {
