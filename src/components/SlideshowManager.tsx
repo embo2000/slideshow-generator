@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { X, Save, FolderOpen, Trash2, Download, Calendar, Clock } from 'lucide-react';
 import { googleDriveService, DriveFile } from '../services/googleDrive';
 import { googleAuthService } from '../services/googleAuth';
-import { ClassData, MusicTrack, BackgroundImage, TransitionType } from '../types';
+import { ClassData, MusicTrack, BackgroundOption, TransitionType } from '../types';
 
 interface SlideshowManagerProps {
   currentSlideshow: {
     classData: ClassData;
     selectedMusic: MusicTrack | null;
-    backgroundImage: BackgroundImage | null;
+    backgroundOption: BackgroundOption;
     selectedTransition: TransitionType;
     classes: string[];
     slideDuration: number;
@@ -17,7 +17,7 @@ interface SlideshowManagerProps {
   onLoadSlideshow: (data: {
     classData: ClassData;
     selectedMusic: MusicTrack | null;
-    backgroundImage: BackgroundImage | null;
+    backgroundOption: BackgroundOption;
     selectedTransition: TransitionType;
     classes: string[];
     slideDuration: number;
@@ -75,7 +75,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
         slideshowName,
         currentSlideshow.classData,
         currentSlideshow.selectedMusic,
-        currentSlideshow.backgroundImage,
+        currentSlideshow.backgroundOption,
         currentSlideshow.selectedTransition,
         currentSlideshow.classes,
         currentSlideshow.slideDuration,

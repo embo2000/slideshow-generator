@@ -25,6 +25,17 @@ export interface BackgroundImage {
   opacity?: number;
 }
 
+export interface BackgroundColor {
+  color: string;
+  opacity?: number;
+}
+
+export interface BackgroundOption {
+  type: 'image' | 'color' | 'none';
+  image?: BackgroundImage;
+  color?: BackgroundColor;
+}
+
 export interface TransitionType {
   id: string;
   name: string;

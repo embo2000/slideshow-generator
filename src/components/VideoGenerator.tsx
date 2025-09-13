@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Download, Play, Pause, RotateCcw } from 'lucide-react';
-import { ClassData, MusicTrack, BackgroundImage, TransitionType } from '../types';
+import { ClassData, MusicTrack, BackgroundOption, TransitionType } from '../types';
 
 interface VideoGeneratorProps {
   classData: ClassData;
   selectedMusic: MusicTrack | null;
-  backgroundImage: BackgroundImage | null;
+  backgroundOption: BackgroundOption;
   selectedTransition: TransitionType;
   slideDuration: number;
   slideshowName: string;
@@ -15,7 +15,7 @@ interface VideoGeneratorProps {
 const VideoGenerator: React.FC<VideoGeneratorProps> = ({
   classData,
   selectedMusic,
-  backgroundImage,
+  backgroundOption,
   selectedTransition,
   slideDuration,
   slideshowName,
@@ -168,9 +168,9 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
 
     // Load background image if provided
     let backgroundImg: HTMLImageElement | null = null;
-    if (backgroundImage) {
+    if (backgroundOption.type === 'image' && backgroundOption.image) {
       backgroundImg = new Image();
-      backgroundImg.src = backgroundImage.url;
+      backgroundImg.src = backgroundOption.image.url;
       await new Promise((resolve) => {
         backgroundImg!.onload = resolve;
       });
@@ -267,7 +267,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
       // Clear canvas and draw background
       if (backgroundImg) {
         // Set background opacity
-        const backgroundOpacity = backgroundImage?.opacity || 0.8;
+        const backgroundOpacity = backgroundOption.image?.opacity || 0.8;
         ctx.globalAlpha = backgroundOpacity;
         
         // Draw background image to fill canvas
@@ -294,6 +294,18 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
         
         // Add overlay for better text readability
         const overlayOpacity = Math.max(0.1, 0.4 - backgroundOpacity * 0.2);
+        ctx.fillStyle = `rgba(0, 0, 0, ${overlayOpacity})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      } else if (backgroundOption.type === 'color' && backgroundOption.color) {
+        // Solid color background
+        const colorOpacity = backgroundOption.color.opacity || 0.8;
+        ctx.globalAlpha = colorOpacity;
+        ctx.fillStyle = backgroundOption.color.color;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.globalAlpha = 1;
+        
+        // Add overlay for better text readability
+        const overlayOpacity = Math.max(0.1, 0.4 - colorOpacity * 0.2);
         ctx.fillStyle = `rgba(0, 0, 0, ${overlayOpacity})`;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       } else {
@@ -445,7 +457,8 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
             <h2 className="text-xl font-bold text-gray-900">Enhanced Video Generator</h2>
             <p className="text-sm text-gray-500 mt-1">
               {slideDuration}s per slide • Transition: {selectedTransition.name} • 
-              {backgroundImage ? ' Custom Background' : ' Default Background'} • 
+              {backgroundOption.type === 'image' ? ' Custom Image' : 
+               backgroundOption.type === 'color' ? ' Solid Color' : ' Default Background'} • 
               {selectedMusic?.name || 'No Music'}
             </p>
           </div>
@@ -519,7 +532,8 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
               <div>• 1920x1080 (1080p)</div>
               <div>• {slideDuration}s per slide</div>
               <div>• {selectedTransition.name} transitions</div>
-              <div>• {backgroundImage ? 'Custom' : 'Gradient'} background</div>
+              <div>• {backgroundOption.type === 'image' ? 'Custom Image' : 
+                       backgroundOption.type === 'color' ? 'Solid Color' : 'Gradient'} background</div>
             </div>
           </div>
         </div>

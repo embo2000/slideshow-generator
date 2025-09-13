@@ -13,7 +13,7 @@ import GoogleAuthButton from './components/GoogleAuthButton';
 import SlideshowManager from './components/SlideshowManager';
 import { googleAuthService, GoogleUser } from './services/googleAuth';
 import { googleDriveService } from './services/googleDrive';
-import { ClassData, MusicTrack, BackgroundImage, TransitionType } from './types';
+import { ClassData, MusicTrack, BackgroundOption, TransitionType } from './types';
 
 const TRANSITION_TYPES: TransitionType[] = [
   { id: 'fade', name: 'Fade', description: 'Smooth fade between images' },
@@ -41,7 +41,7 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [selectedMusic, setSelectedMusic] = useState<MusicTrack | null>(null);
   const [weeklyMusic, setWeeklyMusic] = useState<MusicTrack | null>(null);
-  const [backgroundImage, setBackgroundImage] = useState<BackgroundImage | null>(null);
+  const [backgroundOption, setBackgroundOption] = useState<BackgroundOption>({ type: 'none' });
   const [selectedTransition, setSelectedTransition] = useState<TransitionType>(TRANSITION_TYPES[0]);
   const [currentUser, setCurrentUser] = useState<GoogleUser | null>(null);
   const [showSlideshowManager, setShowSlideshowManager] = useState(false);
@@ -153,7 +153,7 @@ const getTotalPhotos = () => {
 const handleLoadSlideshow = (data: {
   classData?: ClassData;
   selectedMusic?: MusicTrack | null;
-  backgroundImage?: any;
+  backgroundOption?: BackgroundOption;
   selectedTransition?: TransitionType;
   classes?: string[];
   slideDuration?: number;
@@ -171,33 +171,42 @@ const handleLoadSlideshow = (data: {
     if (!normalizedClassData[className]) normalizedClassData[className] = [];
   });
 
-  // Handle background image loading
-  let loadedBackgroundImage: BackgroundImage | null = null;
-  if (data.backgroundImage) {
+  // Handle background option loading
+  let loadedBackgroundOption: BackgroundOption = { type: 'none' };
+  if (data.backgroundOption) {
+    loadedBackgroundOption = data.backgroundOption;
+  } else if (data.backgroundImage) {
+    // Legacy support for old backgroundImage format
     if (typeof data.backgroundImage === 'object' && data.backgroundImage.data) {
       // New format with opacity
       const blob = new Blob([Uint8Array.from(atob(data.backgroundImage.data), c => c.charCodeAt(0))], { type: 'image/jpeg' });
       const file = new File([blob], 'background.jpg', { type: 'image/jpeg' });
-      loadedBackgroundImage = {
-        file,
-        url: URL.createObjectURL(file),
-        opacity: data.backgroundImage.opacity || 0.8
+      loadedBackgroundOption = {
+        type: 'image',
+        image: {
+          file,
+          url: URL.createObjectURL(file),
+          opacity: data.backgroundImage.opacity || 0.8
+        }
       };
     } else if (typeof data.backgroundImage === 'string') {
       // Legacy format without opacity
       const blob = new Blob([Uint8Array.from(atob(data.backgroundImage), c => c.charCodeAt(0))], { type: 'image/jpeg' });
       const file = new File([blob], 'background.jpg', { type: 'image/jpeg' });
-      loadedBackgroundImage = {
-        file,
-        url: URL.createObjectURL(file),
-        opacity: 0.8
+      loadedBackgroundOption = {
+        type: 'image',
+        image: {
+          file,
+          url: URL.createObjectURL(file),
+          opacity: 0.8
+        }
       };
     }
   }
 
   setClassData(normalizedClassData);
   setSelectedMusic(data.selectedMusic ?? null);
-  setBackgroundImage(loadedBackgroundImage);
+  setBackgroundOption(loadedBackgroundOption);
   setSelectedTransition(data.selectedTransition ?? TRANSITION_TYPES[0]);
   setSlideDuration(data.slideDuration ?? 3);
   setSlideshowName(data.slideshowName ?? (() => {
@@ -282,15 +291,15 @@ const normalizeLoadedClassData = (loaded: any) => {
     }
 
     try {
-      await googleDriveService.saveSlideshow(slideshowName, {
+      await googleDriveService.saveSlideshow(slideshowName, 
         classData,
         selectedMusic,
-        backgroundImage,
+        backgroundOption,
         selectedTransition,
         classes,
         slideDuration,
-        slideshowName,
-      });
+        slideshowName
+      );
     } catch (error) {
       console.error('Auto-save failed:', error);
     }
@@ -327,8 +336,8 @@ const normalizeLoadedClassData = (loaded: any) => {
       // Background step
       return (
         <BackgroundStep
-          backgroundImage={backgroundImage}
-          onBackgroundImageUpdate={setBackgroundImage}
+          backgroundOption={backgroundOption}
+          onBackgroundOptionUpdate={setBackgroundOption}
         />
       );
     } else if (currentStep === classes.length + 2) {
@@ -347,7 +356,7 @@ const normalizeLoadedClassData = (loaded: any) => {
         <PreviewStep
           classData={classData}
           selectedMusic={selectedMusic}
-          backgroundImage={backgroundImage}
+          backgroundOption={backgroundOption}
           selectedTransition={selectedTransition}
           slideDuration={slideDuration}
           onSlideDurationChange={setSlideDuration}
@@ -439,7 +448,7 @@ const normalizeLoadedClassData = (loaded: any) => {
           currentSlideshow={{
             classData,
             selectedMusic,
-            backgroundImage,
+            backgroundOption,
             selectedTransition,
             classes,
             slideDuration,
@@ -454,7 +463,7 @@ const normalizeLoadedClassData = (loaded: any) => {
         <VideoGenerator
           classData={classData}
           selectedMusic={selectedMusic}
-          backgroundImage={backgroundImage}
+          backgroundOption={backgroundOption}
           selectedTransition={selectedTransition}
           slideDuration={slideDuration}
           slideshowName={slideshowName}

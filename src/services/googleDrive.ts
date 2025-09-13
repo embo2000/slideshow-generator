@@ -15,7 +15,7 @@ export interface SlideshowData {
   updatedAt: string;
   classData: { [className: string]: string[] }; // Base64 encoded images
   selectedMusic: any;
-  backgroundImage: { data: string; opacity: number } | null; // Base64 encoded with opacity
+  backgroundOption: any; // BackgroundOption with encoded data
   selectedTransition: any;
   slideDuration: number;
   slideshowName: string;
@@ -82,7 +82,7 @@ class GoogleDriveService {
     name: string,
     classData: { [className: string]: File[] },
     selectedMusic: any,
-    backgroundImage: { file: File; url: string } | null,
+    backgroundOption: any,
     selectedTransition: any,
     classes: string[],
     slideDuration: number = 3,
@@ -110,12 +110,20 @@ class GoogleDriveService {
       );
     }
 
-    const processedBackground = backgroundImage
-      ? {
-          data: await fileToBase64(backgroundImage.file),
-          opacity: backgroundImage.opacity || 0.8
+    // Process background option
+    let processedBackgroundOption = backgroundOption;
+    if (backgroundOption.type === 'image' && backgroundOption.image?.file) {
+      processedBackgroundOption = {
+        ...backgroundOption,
+        image: {
+          ...backgroundOption.image,
+          data: await fileToBase64(backgroundOption.image.file),
+          // Remove file and url properties for storage
+          file: undefined,
+          url: undefined
         }
-      : null;
+      };
+    }
 
     const slideshowData: SlideshowData = {
       name,
@@ -123,7 +131,7 @@ class GoogleDriveService {
       updatedAt: new Date().toISOString(),
       classData: processedClassData,
       selectedMusic,
-      backgroundImage: processedBackground,
+      backgroundOption: processedBackgroundOption,
       selectedTransition,
       slideDuration,
       slideshowName,

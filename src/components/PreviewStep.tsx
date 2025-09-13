@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Play, Edit, Music, Image as ImageIcon, Zap, Camera, Clock } from 'lucide-react';
-import { ClassData, MusicTrack, BackgroundImage, TransitionType } from '../types';
+import { ClassData, MusicTrack, BackgroundOption, TransitionType } from '../types';
 import WizardStepWrapper from './WizardStepWrapper';
 
 interface PreviewStepProps {
   classData: ClassData;
   selectedMusic: MusicTrack | null;
-  backgroundImage: BackgroundImage | null;
+  backgroundOption: BackgroundOption;
   selectedTransition: TransitionType;
   slideDuration: number;
   onSlideDurationChange: (duration: number) => void;
@@ -20,7 +20,7 @@ interface PreviewStepProps {
 const PreviewStep: React.FC<PreviewStepProps> = ({
   classData,
   selectedMusic,
-  backgroundImage,
+  backgroundOption,
   selectedTransition,
   slideDuration,
   onSlideDurationChange,
@@ -163,7 +163,8 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
               <span className="font-medium text-purple-900">Background</span>
             </div>
             <div className="text-sm font-semibold text-purple-600">
-              {backgroundImage ? 'Custom Image' : 'Default Gradient'}
+              {backgroundOption.type === 'image' ? 'Custom Image' : 
+               backgroundOption.type === 'color' ? 'Solid Color' : 'Default Gradient'}
             </div>
           </div>
 
@@ -291,8 +292,10 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
               </button>
             </div>
             <p className="text-sm text-gray-600">
-              {backgroundImage 
-                ? `Custom background (${Math.round((backgroundImage.opacity || 0.8) * 100)}% opacity)` 
+              {backgroundOption.type === 'image' && backgroundOption.image
+                ? `Custom image (${Math.round((backgroundOption.image.opacity || 0.8) * 100)}% opacity)`
+                : backgroundOption.type === 'color' && backgroundOption.color
+                ? `Solid color ${backgroundOption.color.color} (${Math.round((backgroundOption.color.opacity || 0.8) * 100)}% opacity)`
                 : 'Default gradient background'}
             </p>
           </div>
