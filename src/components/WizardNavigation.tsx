@@ -27,7 +27,7 @@ const WizardNavigation: React.FC<WizardNavigationProps> = ({
           <button
             onClick={onPrevious}
             disabled={currentStep === 0}
-            className="inline-flex items-center px-4 py-2 text-teal-700 hover:bg-teal-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-medium transition-colors duration-200 border border-teal-200 hover:border-teal-300"
+            className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 disabled:bg-gray-300 text-white rounded-lg font-medium transition-colors duration-200"
           >
             <ChevronLeft className="h-4 w-4 mr-2" />
             Previous
