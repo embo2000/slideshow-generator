@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Play, Edit, Music, Image as ImageIcon, Zap, Camera, Clock } from 'lucide-react';
 import { ClassData, MusicTrack, BackgroundImage, TransitionType } from '../types';
 import WizardStepWrapper from './WizardStepWrapper';
@@ -14,6 +14,7 @@ interface PreviewStepProps {
   onEdit: (step: number) => void;
   slideshowName: string;
   onSlideshowNameChange: (name: string) => void;
+  onAutoSave?: () => Promise<void>;
 }
 
 const PreviewStep: React.FC<PreviewStepProps> = ({
@@ -27,7 +28,39 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
   onEdit,
   slideshowName,
   onSlideshowNameChange
+  onAutoSave
 }) => {
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
+  // Auto-save when component mounts or when slideshow name changes
+  useEffect(() => {
+    const performAutoSave = async () => {
+      if (!onAutoSave || !slideshowName.trim()) return;
+      
+      setIsAutoSaving(true);
+      setAutoSaveStatus('saving');
+      
+      try {
+        await onAutoSave();
+        setAutoSaveStatus('saved');
+        // Reset status after 3 seconds
+        setTimeout(() => setAutoSaveStatus('idle'), 3000);
+      } catch (error) {
+        console.error('Auto-save failed:', error);
+        setAutoSaveStatus('error');
+        // Reset status after 5 seconds
+        setTimeout(() => setAutoSaveStatus('idle'), 5000);
+      } finally {
+        setIsAutoSaving(false);
+      }
+    };
+
+    // Debounce auto-save when slideshow name changes
+    const timeoutId = setTimeout(performAutoSave, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [slideshowName, onAutoSave]);
+
   const getTotalPhotos = () => {
     return Object.values(classData).reduce((total, photos) => total + photos.length, 0);
   };
@@ -53,6 +86,37 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
               <h3 className="text-lg font-semibold text-gray-900">Slideshow Name</h3>
               <p className="text-sm text-gray-600">Give your slideshow a memorable name</p>
             </div>
+            {/* Auto-save status indicator */}
+            {autoSaveStatus !== 'idle' && (
+              <div className="flex items-center space-x-2">
+                {autoSaveStatus === 'saving' && (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    <span className="text-sm text-blue-600">Auto-saving...</span>
+                  </>
+                )}
+                {autoSaveStatus === 'saved' && (
+                  <>
+                    <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                      <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <span className="text-sm text-green-600">Auto-saved</span>
+                  </>
+                )}
+                {autoSaveStatus === 'error' && (
+                  <>
+                    <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
+                      <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <span className="text-sm text-red-600">Save failed</span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
           
           <div className="max-w-md">
