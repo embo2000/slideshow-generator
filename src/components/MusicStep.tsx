@@ -21,12 +21,14 @@ const MusicStep: React.FC<MusicStepProps> = ({
 
   const togglePlay = (track: MusicTrack) => {
     if (playingTrack === track.id) {
+      // Stop currently playing track
       if (audioRefs[track.id]) {
         audioRefs[track.id].pause();
         audioRefs[track.id].currentTime = 0;
       }
       setPlayingTrack(null);
     } else {
+      // Stop all other tracks first
       setPlayingTrack(null);
       Object.entries(audioRefs).forEach(([id, audio]) => {
         if (id !== track.id) {
@@ -35,30 +37,39 @@ const MusicStep: React.FC<MusicStepProps> = ({
         }
       });
 
+      // Create or play the selected track
       if (!audioRefs[track.id]) {
+        // Create new audio element
         const audio = new Audio(track.url);
         audio.volume = 0.5;
+        audio.preload = 'auto';
+        
+        // Add event listeners
         audio.addEventListener('ended', () => {
           setPlayingTrack(null);
         });
         audio.addEventListener('error', () => {
+          console.error('Audio failed to load:', track.url);
           setPlayingTrack(null);
         });
-        audio.addEventListener('canplaythrough', () => {
-          audio.play().catch(() => {
+        audio.addEventListener('loadeddata', () => {
+          console.log('Audio loaded successfully:', track.name);
+          audio.play().catch((error) => {
+            console.error('Audio play failed:', error);
             setPlayingTrack(null);
           });
         });
+        
         audioRefs[track.id] = audio;
-        audio.src = track.url;
-        audio.load();
+        setPlayingTrack(track.id);
       } else {
-        audioRefs[track.id].play().catch(() => {
+        // Play existing audio element
+        audioRefs[track.id].play().catch((error) => {
+          console.error('Audio play failed:', error);
           setPlayingTrack(null);
         });
+        setPlayingTrack(track.id);
       }
-      
-      setPlayingTrack(track.id);
     }
   };
 
