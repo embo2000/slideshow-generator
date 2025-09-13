@@ -39,16 +39,18 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({ onAuthChange }) => 
 
   const handleSignIn = async () => {
     setIsLoading(true);
-    try {
-      const signedInUser = await googleAuthService.signIn();
-      setUser(signedInUser);
-      onAuthChange?.(signedInUser);
-    } catch (error) {
-      console.error('Sign in failed:', error);
-      alert('Failed to sign in with Google. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+    googleAuthService.signIn()
+      .then((signedInUser) => {
+        setUser(signedInUser);
+        onAuthChange?.(signedInUser);
+      })
+      .catch((error) => {
+        console.error('Sign in failed:', error);
+        alert('Failed to sign in with Google. Please try again.');
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   };
 
   const handleSignOut = async () => {
