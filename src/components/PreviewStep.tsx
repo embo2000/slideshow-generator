@@ -27,7 +27,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
   onGenerate,
   onEdit,
   slideshowName,
-  onSlideshowNameChange
+  onSlideshowNameChange,
   onAutoSave
 }) => {
   const [isAutoSaving, setIsAutoSaving] = useState(false);
