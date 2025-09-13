@@ -460,8 +460,8 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
       } else {
         // Default gradient background
         const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-        gradient.addColorStop(0, '#1e3a8a');
-        gradient.addColorStop(1, '#3b82f6');
+        gradient.addColorStop(0, '#0f766e');
+        gradient.addColorStop(1, '#14b8a6');
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
@@ -574,8 +574,8 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
         
         // Animated progress bar with gradient
         const progressGradient = ctx.createLinearGradient(progressBarX, 0, progressBarX + progressBarWidth, 0);
-        progressGradient.addColorStop(0, '#3b82f6');
-        progressGradient.addColorStop(1, '#1d4ed8');
+        progressGradient.addColorStop(0, '#14b8a6');
+        progressGradient.addColorStop(1, '#0d9488');
         ctx.fillStyle = progressGradient;
         ctx.beginPath();
         ctx.roundRect(progressBarX, progressBarY, progressBarWidth * progress, progressBarHeight, 6);
@@ -652,7 +652,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
               </div>
               <div className="w-full bg-gray-200 rounded-full h-3">
                 <div
-                  className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-300 relative overflow-hidden"
+                  className="bg-gradient-to-r from-teal-500 to-cyan-600 h-3 rounded-full transition-all duration-300 relative overflow-hidden"
                   style={{ width: `${progress}%` }}
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-30 animate-pulse" />
@@ -671,7 +671,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
                 <div className="flex space-x-2">
                   <button
                     onClick={downloadVideo}
-                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg font-medium transition-all duration-200 shadow-sm"
+                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm"
                   >
                     <Download className="h-4 w-4 mr-2" />
                     Download

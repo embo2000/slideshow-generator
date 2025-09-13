@@ -94,7 +94,7 @@ const ClassUploadStep: React.FC<ClassUploadStepProps> = ({
         <div
           className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors duration-200 ${
             dragOver 
-              ? 'border-blue-500 bg-blue-50' 
+              ? 'border-teal-500 bg-teal-50' 
               : 'border-gray-300 hover:border-gray-400'
           }`}
           onDrop={handleDrop}
@@ -111,11 +111,11 @@ const ClassUploadStep: React.FC<ClassUploadStepProps> = ({
           />
           
           <div className="flex flex-col items-center space-y-4">
-            <Upload className={`h-12 w-12 ${dragOver ? 'text-blue-500' : 'text-gray-400'}`} />
+            <Upload className={`h-12 w-12 ${dragOver ? 'text-teal-500' : 'text-gray-400'}`} />
             <div>
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="text-lg font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                className="text-lg font-medium text-teal-600 hover:text-teal-700 transition-colors"
                 disabled={photos.length >= 5}
               >
                 {photos.length >= 5 ? 'Maximum photos reached' : 'Click to upload photos'}
@@ -133,8 +133,8 @@ const ClassUploadStep: React.FC<ClassUploadStepProps> = ({
         {/* Progress Indicator */}
         {photos.length > 0 && (
           <div className="flex items-center justify-center space-x-2 p-4 bg-green-50 rounded-lg">
-            <CheckCircle className="h-5 w-5 text-green-600" />
-            <span className="text-green-800 font-medium">
+           <CheckCircle className="h-5 w-5 text-teal-600" />
+           <span className="text-teal-800 font-medium">
               {photos.length} photo{photos.length !== 1 ? 's' : ''} uploaded for {className}
             </span>
           </div>

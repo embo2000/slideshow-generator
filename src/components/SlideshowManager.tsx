@@ -183,7 +183,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
             onClick={() => setActiveTab('save')}
             className={`px-6 py-3 font-medium text-sm transition-colors ${
               activeTab === 'save'
-                ? 'text-blue-600 border-b-2 border-blue-600'
+                ? 'text-teal-600 border-b-2 border-teal-600'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -194,7 +194,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
             onClick={() => setActiveTab('load')}
             className={`px-6 py-3 font-medium text-sm transition-colors ${
               activeTab === 'load'
-                ? 'text-blue-600 border-b-2 border-blue-600'
+                ? 'text-teal-600 border-b-2 border-teal-600'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -248,7 +248,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
               <button
                 onClick={handleSave}
                 disabled={isSaving || !slideshowName.trim()}
-                className="w-full inline-flex items-center justify-center px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-lg font-medium transition-colors"
+                className="w-full inline-flex items-center justify-center px-6 py-3 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-300 text-white rounded-lg font-medium transition-colors"
               >
                 {isSaving ? (
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
@@ -264,7 +264,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
             <div className="space-y-4">
               {isLoading ? (
                 <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto mb-4"></div>
                   <p className="text-gray-500">Loading saved slideshows...</p>
                 </div>
               ) : savedSlideshows.length === 0 ? (
@@ -294,7 +294,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
                         <div className="flex items-center space-x-2">
                           <button
                             onClick={() => handleLoad(slideshow.id)}
-                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
+                            className="px-3 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded text-sm font-medium transition-colors"
                           >
                             Load
                           </button>

@@ -83,7 +83,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 <button
                   onClick={handleAddGroup}
                   disabled={!newGroupName.trim()}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-lg font-medium transition-colors duration-200 flex items-center space-x-2"
+                  className="px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-300 text-white rounded-lg font-medium transition-colors duration-200 flex items-center space-x-2"
                 >
                   <Plus className="h-4 w-4" />
                   <span>Add</span>
@@ -135,7 +135,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-lg font-medium transition-colors duration-200 flex items-center"
+            className="px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-300 text-white rounded-lg font-medium transition-colors duration-200 flex items-center"
           >
             {isSaving ? (
               <>
