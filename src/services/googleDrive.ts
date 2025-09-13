@@ -425,9 +425,6 @@ class GoogleDriveService {
     } catch (error) {
       console.error('Failed to list music files:', error);
       return [];
-    } catch (error) {
-      console.error('Failed to list background images:', error);
-      return [];
     }
   }
 
