@@ -29,7 +29,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
   onEdit,
   slideshowName,
   onSlideshowNameChange,
-  onAutoSave
+  onAutoSave,
   classes
 }) => {
   const [isAutoSaving, setIsAutoSaving] = useState(false);
