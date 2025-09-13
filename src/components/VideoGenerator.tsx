@@ -26,6 +26,14 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
   const [progress, setProgress] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  
+  // Track previous image dimensions for smooth transitions
+  const [prevImageDimensions, setPrevImageDimensions] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
 
   // Auto-start video generation when component mounts
   useEffect(() => {
@@ -40,41 +48,92 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
     progress: number,
     transitionType: string,
     canvas: HTMLCanvasElement,
-    drawParams: { x: number; y: number; width: number; height: number }
+    drawParams: { x: number; y: number; width: number; height: number },
+    prevDimensions: { x: number; y: number; width: number; height: number } | null
   ) => {
     const { x, y, width, height } = drawParams;
+    
+    // Calculate smooth dimension transition for aspect ratio changes
+    let finalX = x, finalY = y, finalWidth = width, finalHeight = height;
+    
+    if (prevDimensions && progress < 0.3) {
+      // Smooth transition from previous dimensions to current dimensions
+      const transitionProgress = progress / 0.3;
+      const easeProgress = 1 - Math.pow(1 - transitionProgress, 3); // Ease-out cubic
+      
+      finalX = prevDimensions.x + (x - prevDimensions.x) * easeProgress;
+      finalY = prevDimensions.y + (y - prevDimensions.y) * easeProgress;
+      finalWidth = prevDimensions.width + (width - prevDimensions.width) * easeProgress;
+      finalHeight = prevDimensions.height + (height - prevDimensions.height) * easeProgress;
+    }
     
     switch (transitionType) {
       case 'fade':
         if (nextImg && progress > 0.8) {
           const fadeProgress = (progress - 0.8) / 0.2;
           ctx.globalAlpha = 1 - fadeProgress;
-          ctx.drawImage(currentImg, x, y, width, height);
+          ctx.drawImage(currentImg, finalX, finalY, finalWidth, finalHeight);
           ctx.globalAlpha = fadeProgress;
-          ctx.drawImage(nextImg, x, y, width, height);
+          
+          // For next image, calculate its dimensions
+          const nextImageAspect = nextImg.width / nextImg.height;
+          const canvasAspect = canvas.width / canvas.height;
+          
+          let nextDrawWidth, nextDrawHeight, nextX, nextY;
+          if (nextImageAspect > canvasAspect) {
+            nextDrawWidth = canvas.width * 0.7;
+            nextDrawHeight = nextDrawWidth / nextImageAspect;
+            nextX = canvas.width * 0.15;
+            nextY = (canvas.height - nextDrawHeight) / 2;
+          } else {
+            nextDrawHeight = canvas.height * 0.7;
+            nextDrawWidth = nextDrawHeight * nextImageAspect;
+            nextX = (canvas.width - nextDrawWidth) / 2;
+            nextY = canvas.height * 0.15;
+          }
+          
+          ctx.drawImage(nextImg, nextX, nextY, nextDrawWidth, nextDrawHeight);
           ctx.globalAlpha = 1;
         } else {
-          ctx.drawImage(currentImg, x, y, width, height);
+          ctx.drawImage(currentImg, finalX, finalY, finalWidth, finalHeight);
         }
         break;
         
       case 'slide':
         if (nextImg && progress > 0.7) {
           const slideProgress = (progress - 0.7) / 0.3;
-          const slideOffset = width * slideProgress;
-          ctx.drawImage(currentImg, x - slideOffset, y, width, height);
-          ctx.drawImage(nextImg, x + width - slideOffset, y, width, height);
+          const slideOffset = finalWidth * slideProgress;
+          ctx.drawImage(currentImg, finalX - slideOffset, finalY, finalWidth, finalHeight);
+          
+          // Calculate next image dimensions for slide
+          const nextImageAspect = nextImg.width / nextImg.height;
+          const canvasAspect = canvas.width / canvas.height;
+          
+          let nextDrawWidth, nextDrawHeight, nextX, nextY;
+          if (nextImageAspect > canvasAspect) {
+            nextDrawWidth = canvas.width * 0.7;
+            nextDrawHeight = nextDrawWidth / nextImageAspect;
+            nextX = canvas.width * 0.15;
+            nextY = (canvas.height - nextDrawHeight) / 2;
+          } else {
+            nextDrawHeight = canvas.height * 0.7;
+            nextDrawWidth = nextDrawHeight * nextImageAspect;
+            nextX = (canvas.width - nextDrawWidth) / 2;
+            nextY = canvas.height * 0.15;
+          }
+          
+          ctx.drawImage(nextImg, nextX + nextDrawWidth - slideOffset, nextY, nextDrawWidth, nextDrawHeight);
         } else {
-          ctx.drawImage(currentImg, x, y, width, height);
+          ctx.drawImage(currentImg, finalX, finalY, finalWidth, finalHeight);
         }
         break;
         
       case 'zoom':
         const zoomFactor = 1 + (progress * 0.1);
-        const zoomedWidth = width * zoomFactor;
-        const zoomedHeight = height * zoomFactor;
-        const zoomedX = x - (zoomedWidth - width) / 2;
-        const zoomedY = y - (zoomedHeight - height) / 2;
+        const zoomedWidth = finalWidth * zoomFactor;
+        const zoomedHeight = finalHeight * zoomFactor;
+        const zoomedX = finalX - (zoomedWidth - finalWidth) / 2;
+        const zoomedY = finalY - (zoomedHeight - finalHeight) / 2;
         ctx.drawImage(currentImg, zoomedX, zoomedY, zoomedWidth, zoomedHeight);
         break;
         
@@ -83,13 +142,30 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
           const flipProgress = (progress - 0.5) / 0.5;
           const scaleX = Math.cos(flipProgress * Math.PI);
           ctx.save();
-          ctx.translate(x + width / 2, y + height / 2);
+          ctx.translate(finalX + finalWidth / 2, finalY + finalHeight / 2);
           ctx.scale(Math.abs(scaleX), 1);
-          const imgToShow = scaleX > 0 ? currentImg : nextImg;
-          ctx.drawImage(imgToShow, -width / 2, -height / 2, width, height);
+          
+          if (scaleX > 0) {
+            ctx.drawImage(currentImg, -finalWidth / 2, -finalHeight / 2, finalWidth, finalHeight);
+          } else {
+            // Calculate next image dimensions for flip
+            const nextImageAspect = nextImg.width / nextImg.height;
+            const canvasAspect = canvas.width / canvas.height;
+            
+            let nextDrawWidth, nextDrawHeight;
+            if (nextImageAspect > canvasAspect) {
+              nextDrawWidth = canvas.width * 0.7;
+              nextDrawHeight = nextDrawWidth / nextImageAspect;
+            } else {
+              nextDrawHeight = canvas.height * 0.7;
+              nextDrawWidth = nextDrawHeight * nextImageAspect;
+            }
+            
+            ctx.drawImage(nextImg, -nextDrawWidth / 2, -nextDrawHeight / 2, nextDrawWidth, nextDrawHeight);
+          }
           ctx.restore();
         } else {
-          ctx.drawImage(currentImg, x, y, width, height);
+          ctx.drawImage(currentImg, finalX, finalY, finalWidth, finalHeight);
         }
         break;
         
@@ -97,26 +173,41 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
         if (nextImg && progress > 0.6) {
           const dissolveProgress = (progress - 0.6) / 0.4;
           // Create a smooth dissolve effect using alpha blending
-          ctx.drawImage(currentImg, x, y, width, height);
+          ctx.drawImage(currentImg, finalX, finalY, finalWidth, finalHeight);
           
           // Create dissolve mask using noise pattern
-          const imageData = ctx.getImageData(x, y, width, height);
+          const imageData = ctx.getImageData(finalX, finalY, finalWidth, finalHeight);
           const data = imageData.data;
           
           // Create a temporary canvas for the next image
           const tempCanvas = document.createElement('canvas');
-          tempCanvas.width = width;
-          tempCanvas.height = height;
+          tempCanvas.width = finalWidth;
+          tempCanvas.height = finalHeight;
           const tempCtx = tempCanvas.getContext('2d')!;
-          tempCtx.drawImage(nextImg, 0, 0, width, height);
-          const nextImageData = tempCtx.getImageData(0, 0, width, height);
+          
+          // Calculate next image dimensions for dissolve
+          const nextImageAspect = nextImg.width / nextImg.height;
+          const canvasAspect = canvas.width / canvas.height;
+          
+          let nextDrawWidth, nextDrawHeight;
+          if (nextImageAspect > canvasAspect) {
+            nextDrawWidth = canvas.width * 0.7;
+            nextDrawHeight = nextDrawWidth / nextImageAspect;
+          } else {
+            nextDrawHeight = canvas.height * 0.7;
+            nextDrawWidth = nextDrawHeight * nextImageAspect;
+          }
+          
+          // Scale next image to match current image dimensions for dissolve
+          tempCtx.drawImage(nextImg, 0, 0, finalWidth, finalHeight);
+          const nextImageData = tempCtx.getImageData(0, 0, finalWidth, finalHeight);
           const nextData = nextImageData.data;
           
           // Apply dissolve effect pixel by pixel with smooth noise
           for (let i = 0; i < data.length; i += 4) {
             const pixelIndex = i / 4;
-            const pixelX = pixelIndex % width;
-            const pixelY = Math.floor(pixelIndex / width);
+            const pixelX = pixelIndex % finalWidth;
+            const pixelY = Math.floor(pixelIndex / finalWidth);
             
             // Create smooth noise pattern based on position
             const noiseValue = (Math.sin(pixelX * 0.1) + Math.cos(pixelY * 0.1) + 
@@ -132,14 +223,14 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
             }
           }
           
-          ctx.putImageData(imageData, x, y);
+          ctx.putImageData(imageData, finalX, finalY);
         } else {
-          ctx.drawImage(currentImg, x, y, width, height);
+          ctx.drawImage(currentImg, finalX, finalY, finalWidth, finalHeight);
         }
         break;
         
       default:
-        ctx.drawImage(currentImg, x, y, width, height);
+        ctx.drawImage(currentImg, finalX, finalY, finalWidth, finalHeight);
     }
   };
 
@@ -231,6 +322,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
     const fadeOutDuration = 2000; // 2 seconds fade out
     const fadeOutStartTime = totalDuration - fadeOutDuration;
     const startTime = Date.now();
+    let previousDimensions: { x: number; y: number; width: number; height: number } | null = null;
     
     // Preload all images
     const loadedImages: { [key: string]: HTMLImageElement } = {};
@@ -357,8 +449,14 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
           photoProgress,
           selectedTransition.id,
           canvas,
-          { x, y, width: drawWidth, height: drawHeight }
+          { x, y, width: drawWidth, height: drawHeight },
+          previousDimensions
         );
+        
+        // Store current dimensions for next transition
+        if (photoProgress > 0.7) {
+          previousDimensions = { x, y, width: drawWidth, height: drawHeight };
+        }
         
         // Reset shadow
         ctx.shadowColor = 'transparent';
