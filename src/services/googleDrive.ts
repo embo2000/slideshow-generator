@@ -370,6 +370,63 @@ class GoogleDriveService {
       headers: { Authorization: `Bearer ${token}` },
     });
   }
+
+  async listBackgroundImages(): Promise<Array<{
+    id: string;
+    name: string;
+    url: string;
+    createdTime: string;
+  }>> {
+    try {
+      const token = await this.getToken();
+      const assetsFolderId = await this.ensureAssetsFolder();
+
+      const res = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+          `'${assetsFolderId}' in parents and mimeType contains 'image/' and trashed=false`
+        )}&fields=files(id,name,createdTime)&orderBy=createdTime desc`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (!res.ok) {
+        console.error('Failed to list background images:', await res.text());
+        return [];
+      }
+
+      const data = await res.json();
+      const images = data.files || [];
+
+      // Generate URLs for each image
+      const imagesWithUrls = await Promise.all(
+        images.map(async (image: any) => {
+          try {
+            const url = await this.loadAssetFromDrive(image.id);
+            return {
+              id: image.id,
+              name: image.name,
+              url: url,
+              createdTime: image.createdTime
+            };
+          } catch (error) {
+            console.error(`Failed to load URL for image ${image.name}:`, error);
+            return null;
+          }
+        })
+      );
+
+      return imagesWithUrls.filter(image => image !== null) as Array<{
+        id: string;
+        name: string;
+        url: string;
+        createdTime: string;
+      }>;
+    } catch (error) {
+      console.error('Failed to list background images:', error);
+      return [];
+    }
+  }
 }
 
 export const googleDriveService = new GoogleDriveService();

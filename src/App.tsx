@@ -71,10 +71,6 @@ function App() {
             });
             setClassData(newClassData);
           }
-          
-          // Load existing background images
-          const backgroundImages = await googleDriveService.listBackgroundImages();
-          setExistingBackgroundImages(backgroundImages);
         } catch (error) {
           console.error('Failed to load groups settings:', error);
         }
@@ -442,6 +438,8 @@ const normalizeLoadedClassData = (loaded: any) => {
         <BackgroundStep
           backgroundOption={backgroundOption}
           onBackgroundOptionUpdate={setBackgroundOption}
+          existingBackgroundImages={existingBackgroundImages}
+          onLoadExistingImage={handleLoadExistingBackgroundImage}
         />
       );
     } else if (currentStep === classes.length + 2) {
