@@ -203,6 +203,32 @@ class GoogleDriveService {
       throw new Error(`Failed to load slideshow: ${res.status}`);
     }
     const data = await res.json();
+    
+    // Process loaded data to restore assets from Drive
+    if (data.backgroundOption?.image?.assetId) {
+      try {
+        const assetUrl = await this.loadAssetFromDrive(data.backgroundOption.image.assetId);
+        data.backgroundOption.image.url = assetUrl;
+        console.log('Background image loaded from Drive');
+      } catch (error) {
+        console.error('Failed to load background image from Drive:', error);
+        // Fallback to base64 if available
+        if (data.backgroundOption.image.data) {
+          data.backgroundOption.image.url = `data:image/jpeg;base64,${data.backgroundOption.image.data}`;
+        }
+      }
+    }
+    
+    if (data.selectedMusic?.assetId) {
+      try {
+        const assetUrl = await this.loadAssetFromDrive(data.selectedMusic.assetId);
+        data.selectedMusic.url = assetUrl;
+        console.log('Background music loaded from Drive');
+      } catch (error) {
+        console.error('Failed to load background music from Drive:', error);
+      }
+    }
+    
     console.log('Slideshow loaded successfully:', data.name);
     return data;
   }
