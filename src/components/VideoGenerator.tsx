@@ -380,16 +380,11 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
         ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
         ctx.shadowBlur = 10;
         ctx.fillStyle = 'white';
-        ctx.font = 'bold 52px Arial';
+        ctx.font = 'bold 42px Arial';
         ctx.textAlign = 'center';
         
-        // Add text animation based on photo progress
-        const textScale = 1 + Math.sin(photoProgress * Math.PI * 2) * 0.05;
-        ctx.save();
-        ctx.translate(canvas.width / 2, canvas.height - 50);
-        ctx.scale(textScale, textScale);
-        ctx.fillText(currentPhoto.className, 0, 0);
-        ctx.restore();
+        // Static text without animation
+        ctx.fillText(currentPhoto.className, canvas.width / 2, canvas.height - 50);
         
         // Reset text shadow
         ctx.shadowColor = 'transparent';
