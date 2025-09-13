@@ -32,8 +32,30 @@ const DEFAULT_CLASSES = [
 ];
 
 const MUSIC_TRACKS: MusicTrack[] = [
-  // Note: Add your own music files to the public/music/ directory
-  // For now, using placeholder entries - you can add custom audio via the "Add Audio" button
+  {
+    id: 'sample-1',
+    name: 'Upbeat Electronic',
+    url: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
+    duration: 30
+  },
+  {
+    id: 'sample-2', 
+    name: 'Ambient Background',
+    url: 'https://file-examples.com/storage/fe68c1b7c66d5b2c2daa694/2017/11/file_example_MP3_700KB.mp3',
+    duration: 27
+  },
+  {
+    id: 'sample-3',
+    name: 'Energetic Beat',
+    url: 'https://file-examples.com/storage/fe68c1b7c66d5b2c2daa694/2017/11/file_example_MP3_1MG.mp3', 
+    duration: 33
+  },
+  {
+    id: 'sample-4',
+    name: 'Motivational Track',
+    url: 'https://www.learningcontainer.com/wp-content/uploads/2020/02/Kalimba.mp3',
+    duration: 30
+  }
 ];
 
 function App() {
