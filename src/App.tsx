@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, Save } from 'lucide-react';
+import { Save } from 'lucide-react';
 import WizardProgress from './components/WizardProgress';
 import WizardNavigation from './components/WizardNavigation';
 import ClassUploadStep from './components/ClassUploadStep';
@@ -608,7 +608,15 @@ const normalizeLoadedClassData = (loaded: any) => {
                 className="p-2 bg-teal-500 hover:bg-teal-600 rounded-lg transition-colors cursor-pointer"
                 title="Go to first step"
               >
-                <Camera className="h-6 w-6 text-white" />
+                <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="2" y="4" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="2" fill="none"/>
+                  <rect x="1" y="2" width="2" height="18" rx="1" fill="currentColor"/>
+                  <rect x="21" y="2" width="2" height="18" rx="1" fill="currentColor"/>
+                  <rect x="4" y="2" width="1" height="18" rx="0.5" fill="currentColor"/>
+                  <rect x="19" y="2" width="1" height="18" rx="0.5" fill="currentColor"/>
+                  <circle cx="12" cy="8" r="1.5" fill="currentColor"/>
+                  <path d="M6 14l3-3 2 2 4-4 3 3v2H6v-2z" fill="currentColor"/>
+                </svg>
               </button>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">Slideshow Generator</h1>
