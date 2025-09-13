@@ -1,10 +1,13 @@
 export interface MusicTrack {
   id: string;
   name: string;
+  title?: string;
+  artist?: string;
   url: string;
   duration: number;
   isCustom?: boolean;
   file?: File;
+  assetId?: string;
 }
 
 export interface ClassData {

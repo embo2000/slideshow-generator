@@ -197,9 +197,10 @@ const getTotalPhotos = () => {
   }) => {
     setSelectedMusic({
       id: musicData.id,
+      name: musicData.name,
       title: musicData.name,
-      artist: 'Uploaded Music',
-      duration: '0:00',
+      artist: 'Your Music',
+      duration: 0,
       url: musicData.url,
       assetId: musicData.id
     });

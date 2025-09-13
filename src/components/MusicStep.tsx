@@ -236,7 +236,10 @@ const MusicStep: React.FC<MusicStepProps> = ({
                       ? 'border-teal-500 bg-teal-50 shadow-md'
                       : 'border-gray-200 hover:border-teal-500 bg-white hover:bg-teal-50'
                   }`}
-                  onClick={() => onLoadExistingMusic?.(music)}
+                  onClick={() => {
+                    console.log('Selecting existing music:', music);
+                    onLoadExistingMusic?.(music);
+                  }}
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-3">
