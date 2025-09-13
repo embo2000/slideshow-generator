@@ -83,7 +83,10 @@ const BackgroundStep: React.FC<BackgroundStepProps> = ({
                     step="0.1"
                     value={backgroundImage.opacity || 0.8}
                     onChange={(e) => handleOpacityChange(parseFloat(e.target.value))}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                    style={{
+                      background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((backgroundImage.opacity || 0.8) - 0.1) / 0.9 * 100}%, #e5e7eb ${((backgroundImage.opacity || 0.8) - 0.1) / 0.9 * 100}%, #e5e7eb 100%)`
+                    }}
                   />
                   <div className="flex justify-between text-xs text-gray-500 mt-1">
                     <span>10%</span>
