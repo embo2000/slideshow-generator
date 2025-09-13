@@ -234,7 +234,12 @@ const handleLoadSlideshow = (data: {
   slideDuration?: number;
   slideshowName?: string;
 }) => {
-  const slideshowClasses = Array.isArray(data.classes) ? data.classes : DEFAULT_CLASSES;
+  // Use classes from slideshow data, fallback to settings.classes, then DEFAULT_CLASSES
+  const slideshowClasses = Array.isArray(data.classes) 
+    ? data.classes 
+    : Array.isArray((data as any).settings?.classes) 
+    ? (data as any).settings.classes 
+    : DEFAULT_CLASSES;
 
   console.log('slideshowClasses:', slideshowClasses);
   
@@ -243,7 +248,46 @@ const handleLoadSlideshow = (data: {
     let processedClassData: ClassData = {};
     
     if (data.classData) {
-      processedClassData = await convertBase64ToFiles(data.classData as { [className: string]: string[] });
+      // Handle both base64 strings and already processed data
+      const rawClassData = data.classData as { [className: string]: any[] };
+      for (const [className, images] of Object.entries(rawClassData)) {
+        if (Array.isArray(images)) {
+          processedClassData[className] = await Promise.all(
+            images.map(async (img: any, index: number) => {
+              try {
+                // If it's already a File object, use it
+                if (img instanceof File) {
+                  return img;
+                }
+                
+                // If it's a base64 string, convert it
+                if (typeof img === 'string') {
+                  const base64Data = img.startsWith('data:') ? img : `data:image/jpeg;base64,${img}`;
+                  const response = await fetch(base64Data);
+                  const blob = await response.blob();
+                  return new File([blob], `${className}-image-${index + 1}.jpg`, { type: 'image/jpeg' });
+                }
+                
+                // If it's an object with data property
+                if (img && typeof img === 'object' && img.data) {
+                  const base64Data = `data:image/jpeg;base64,${img.data}`;
+                  const response = await fetch(base64Data);
+                  const blob = await response.blob();
+                  return new File([blob], `${className}-image-${index + 1}.jpg`, { type: 'image/jpeg' });
+                }
+                
+                console.warn('Unknown image format:', img);
+                return null;
+              } catch (error) {
+                console.error('Failed to convert image:', error);
+                return null;
+              }
+            })
+          ).then(files => files.filter(file => file !== null) as File[]);
+        } else {
+          processedClassData[className] = [];
+        }
+      }
     }
 
     // Ensure every class has an array (even if missing in loaded data)
@@ -275,6 +319,8 @@ const handleLoadSlideshow = (data: {
       console.log('Using background music from Drive');
     }
 
+    console.log('Final processed class data:', Object.keys(processedClassData));
+    console.log('Total photos loaded:', Object.values(processedClassData).reduce((total, photos) => total + photos.length, 0));
     setClassData(processedClassData);
     setSelectedMusic(loadedSelectedMusic ?? null);
     setBackgroundOption(loadedBackgroundOption);

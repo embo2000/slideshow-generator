@@ -248,6 +248,13 @@ class GoogleDriveService {
     }
     const data = await res.json();
     
+    console.log('Raw slideshow data loaded:', {
+      name: data.name,
+      classDataKeys: Object.keys(data.classData || {}),
+      classes: data.classes || data.settings?.classes,
+      hasBackgroundOption: !!data.backgroundOption,
+      hasSelectedMusic: !!data.selectedMusic
+    });
     if (data.backgroundOption?.image?.assetId) {
       try {
         const assetUrl = await this.loadAssetFromDrive(data.backgroundOption.image.assetId);
