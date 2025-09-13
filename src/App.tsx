@@ -624,24 +624,12 @@ const normalizeLoadedClassData = (loaded: any) => {
               </div>
             </div>
             
-            <button
-              onClick={() => setShowSettings(true)}
-              className="text-sm text-gray-600 hover:text-gray-900 underline mr-4"
-            >
-              Manage Groups
-            </button>
-            
             <div className="flex items-center space-x-4">
-              {currentUser && (
-                <button
-                  onClick={() => setShowSlideshowManager(true)}
-                  className="inline-flex items-center px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <Save className="h-4 w-4 mr-1" />
-                  My Slideshows
-                </button>
-              )}
-              <GoogleAuthButton onAuthChange={setCurrentUser} />
+              <GoogleAuthButton 
+                onAuthChange={setCurrentUser}
+                onShowSettings={() => setShowSettings(true)}
+                onShowSlideshowManager={() => setShowSlideshowManager(true)}
+              />
             </div>
           </div>
         </div>

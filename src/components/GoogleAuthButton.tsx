@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { LogIn, LogOut, User, ChevronDown } from 'lucide-react';
+import { LogIn, LogOut, User, ChevronDown, Settings, Save } from 'lucide-react';
 import { googleAuthService, GoogleUser } from '../services/googleAuth';
 
 interface GoogleAuthButtonProps {
   onAuthChange?: (user: GoogleUser | null) => void;
+  onShowSettings?: () => void;
+  onShowSlideshowManager?: () => void;
 }
 
-const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({ onAuthChange }) => {
+const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({ 
+  onAuthChange, 
+  onShowSettings, 
+  onShowSlideshowManager 
+}) => {
   const [user, setUser] = useState<GoogleUser | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
@@ -126,6 +132,27 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({ onAuthChange }) => 
               <p className="text-sm font-medium text-gray-900">{user.name}</p>
               <p className="text-xs text-gray-500">{user.email}</p>
             </div>
+            <button
+              onClick={() => {
+                onShowSlideshowManager?.();
+                setShowDropdown(false);
+              }}
+              className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              My Slideshows
+            </button>
+            <button
+              onClick={() => {
+                onShowSettings?.();
+                setShowDropdown(false);
+              }}
+              className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Manage Groups
+            </button>
+            <div className="border-t border-gray-100 my-1"></div>
             <button
               onClick={() => {
                 handleSignOut();
