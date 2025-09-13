@@ -153,7 +153,7 @@ const getTotalPhotos = () => {
 const handleLoadSlideshow = (data: {
   classData?: ClassData;
   selectedMusic?: MusicTrack | null;
-  backgroundImage?: BackgroundImage | null;
+  backgroundImage?: any;
   selectedTransition?: TransitionType;
   classes?: string[];
   slideDuration?: number;
@@ -171,9 +171,33 @@ const handleLoadSlideshow = (data: {
     if (!normalizedClassData[className]) normalizedClassData[className] = [];
   });
 
+  // Handle background image loading
+  let loadedBackgroundImage: BackgroundImage | null = null;
+  if (data.backgroundImage) {
+    if (typeof data.backgroundImage === 'object' && data.backgroundImage.data) {
+      // New format with opacity
+      const blob = new Blob([Uint8Array.from(atob(data.backgroundImage.data), c => c.charCodeAt(0))], { type: 'image/jpeg' });
+      const file = new File([blob], 'background.jpg', { type: 'image/jpeg' });
+      loadedBackgroundImage = {
+        file,
+        url: URL.createObjectURL(file),
+        opacity: data.backgroundImage.opacity || 0.8
+      };
+    } else if (typeof data.backgroundImage === 'string') {
+      // Legacy format without opacity
+      const blob = new Blob([Uint8Array.from(atob(data.backgroundImage), c => c.charCodeAt(0))], { type: 'image/jpeg' });
+      const file = new File([blob], 'background.jpg', { type: 'image/jpeg' });
+      loadedBackgroundImage = {
+        file,
+        url: URL.createObjectURL(file),
+        opacity: 0.8
+      };
+    }
+  }
+
   setClassData(normalizedClassData);
   setSelectedMusic(data.selectedMusic ?? null);
-  setBackgroundImage(data.backgroundImage ?? null);
+  setBackgroundImage(loadedBackgroundImage);
   setSelectedTransition(data.selectedTransition ?? TRANSITION_TYPES[0]);
   setSlideDuration(data.slideDuration ?? 3);
   setSlideshowName(data.slideshowName ?? (() => {

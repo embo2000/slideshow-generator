@@ -266,6 +266,10 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
 
       // Clear canvas and draw background
       if (backgroundImg) {
+        // Set background opacity
+        const backgroundOpacity = backgroundImage?.opacity || 0.8;
+        ctx.globalAlpha = backgroundOpacity;
+        
         // Draw background image to fill canvas
         const bgAspect = backgroundImg.width / backgroundImg.height;
         const canvasAspect = canvas.width / canvas.height;
@@ -285,8 +289,12 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
         
         ctx.drawImage(backgroundImg, bgX, bgY, bgWidth, bgHeight);
         
+        // Reset alpha for overlay
+        ctx.globalAlpha = 1;
+        
         // Add overlay for better text readability
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        const overlayOpacity = Math.max(0.1, 0.4 - backgroundOpacity * 0.2);
+        ctx.fillStyle = `rgba(0, 0, 0, ${overlayOpacity})`;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       } else {
         // Default gradient background

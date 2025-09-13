@@ -18,7 +18,13 @@ const BackgroundStep: React.FC<BackgroundStepProps> = ({
     const file = e.target.files?.[0];
     if (file && file.type.startsWith('image/')) {
       const url = URL.createObjectURL(file);
-      onBackgroundImageUpdate({ file, url });
+      onBackgroundImageUpdate({ file, url, opacity: 0.8 });
+    }
+  };
+
+  const handleOpacityChange = (opacity: number) => {
+    if (backgroundImage) {
+      onBackgroundImageUpdate({ ...backgroundImage, opacity });
     }
   };
 
@@ -57,6 +63,48 @@ const BackgroundStep: React.FC<BackgroundStepProps> = ({
               <p className="text-sm text-green-600 mt-1">
                 This image will appear behind all photos in your slideshow
               </p>
+            </div>
+            
+            {/* Opacity Control */}
+            <div className="bg-white border rounded-lg p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-medium text-gray-900">Background Opacity</h3>
+                  <p className="text-sm text-gray-600">Adjust how transparent the background image appears</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-6">
+                <div className="flex-1">
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="1"
+                    step="0.1"
+                    value={backgroundImage.opacity || 0.8}
+                    onChange={(e) => handleOpacityChange(parseFloat(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>10%</span>
+                    <span>50%</span>
+                    <span>100%</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-lg font-bold text-gray-900">
+                    {Math.round((backgroundImage.opacity || 0.8) * 100)}%
+                  </div>
+                  <div className="text-sm text-gray-500">opacity</div>
+                </div>
+              </div>
+              
+              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-600">
+                  <strong>Preview:</strong> Lower opacity makes the background more subtle, 
+                  while higher opacity makes it more prominent behind your photos.
+                </p>
+              </div>
             </div>
           </div>
         ) : (

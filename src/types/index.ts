@@ -22,6 +22,7 @@ export interface VideoSettings {
 export interface BackgroundImage {
   file: File;
   url: string;
+  opacity?: number;
 }
 
 export interface TransitionType {

@@ -291,7 +291,9 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
               </button>
             </div>
             <p className="text-sm text-gray-600">
-              {backgroundImage ? 'Custom background image' : 'Default gradient background'}
+              {backgroundImage 
+                ? `Custom background (${Math.round((backgroundImage.opacity || 0.8) * 100)}% opacity)` 
+                : 'Default gradient background'}
             </p>
           </div>
 

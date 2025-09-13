@@ -15,7 +15,7 @@ export interface SlideshowData {
   updatedAt: string;
   classData: { [className: string]: string[] }; // Base64 encoded images
   selectedMusic: any;
-  backgroundImage: string | null; // Base64 encoded
+  backgroundImage: { data: string; opacity: number } | null; // Base64 encoded with opacity
   selectedTransition: any;
   slideDuration: number;
   slideshowName: string;
@@ -111,7 +111,10 @@ class GoogleDriveService {
     }
 
     const processedBackground = backgroundImage
-      ? await fileToBase64(backgroundImage.file)
+      ? {
+          data: await fileToBase64(backgroundImage.file),
+          opacity: backgroundImage.opacity || 0.8
+        }
       : null;
 
     const slideshowData: SlideshowData = {
