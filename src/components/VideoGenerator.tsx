@@ -92,17 +92,43 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
       case 'dissolve':
         if (nextImg && progress > 0.6) {
           const dissolveProgress = (progress - 0.6) / 0.4;
-          // Create a pixelated dissolve effect
-          const pixelSize = 8;
-          for (let px = 0; px < width; px += pixelSize) {
-            for (let py = 0; py < height; py += pixelSize) {
-              if (Math.random() < dissolveProgress) {
-                ctx.drawImage(nextImg, x + px, y + py, pixelSize, pixelSize, x + px, y + py, pixelSize, pixelSize);
-              } else {
-                ctx.drawImage(currentImg, x + px, y + py, pixelSize, pixelSize, x + px, y + py, pixelSize, pixelSize);
-              }
+          // Create a smooth dissolve effect using alpha blending
+          ctx.drawImage(currentImg, x, y, width, height);
+          
+          // Create dissolve mask using noise pattern
+          const imageData = ctx.getImageData(x, y, width, height);
+          const data = imageData.data;
+          
+          // Create a temporary canvas for the next image
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = width;
+          tempCanvas.height = height;
+          const tempCtx = tempCanvas.getContext('2d')!;
+          tempCtx.drawImage(nextImg, 0, 0, width, height);
+          const nextImageData = tempCtx.getImageData(0, 0, width, height);
+          const nextData = nextImageData.data;
+          
+          // Apply dissolve effect pixel by pixel with smooth noise
+          for (let i = 0; i < data.length; i += 4) {
+            const pixelIndex = i / 4;
+            const pixelX = pixelIndex % width;
+            const pixelY = Math.floor(pixelIndex / width);
+            
+            // Create smooth noise pattern based on position
+            const noiseValue = (Math.sin(pixelX * 0.1) + Math.cos(pixelY * 0.1) + 
+                              Math.sin((pixelX + pixelY) * 0.05)) / 3;
+            const threshold = (noiseValue + 1) / 2; // Normalize to 0-1
+            
+            // Blend pixels based on dissolve progress and noise threshold
+            if (dissolveProgress > threshold) {
+              data[i] = nextData[i];         // Red
+              data[i + 1] = nextData[i + 1]; // Green
+              data[i + 2] = nextData[i + 2]; // Blue
+              data[i + 3] = nextData[i + 3]; // Alpha
             }
           }
+          
+          ctx.putImageData(imageData, x, y);
         } else {
           ctx.drawImage(currentImg, x, y, width, height);
         }
