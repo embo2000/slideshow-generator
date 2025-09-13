@@ -41,7 +41,7 @@ const MUSIC_TRACKS: MusicTrack[] = [
   {
     id: 'sample-2', 
     name: 'Ambient Background',
-    url: 'https://file-examples.com/storage/fe68c1b7c66d5b2c2daa694/2017/11/file_example_MP3_700KB.mp3',
+    url: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
     duration: 27
   },
   {
