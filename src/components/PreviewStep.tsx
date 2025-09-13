@@ -277,30 +277,6 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
           </div>
         </div>
 
-        {/* Settings Preview */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white border rounded-lg p-4">
-            <h4 className="font-medium text-gray-900 mb-2">Background</h4>
-            <p className="text-sm text-gray-600">
-              {backgroundOption.type === 'image' && backgroundOption.image
-                ? `Custom image (${Math.round((backgroundOption.image.opacity || 0.8) * 100)}% opacity)`
-                : backgroundOption.type === 'color' && backgroundOption.color
-                ? `Solid color ${backgroundOption.color.color} (${Math.round((backgroundOption.color.opacity || 0.8) * 100)}% opacity)`
-                : 'Default gradient background'}
-            </p>
-          </div>
-
-          <div className="bg-white border rounded-lg p-4">
-            <h4 className="font-medium text-gray-900 mb-2">Transitions</h4>
-            <p className="text-sm text-gray-600">{selectedTransition.name}</p>
-          </div>
-
-          <div className="bg-white border rounded-lg p-4">
-            <h4 className="font-medium text-gray-900 mb-2">Slide Duration</h4>
-            <p className="text-sm text-gray-600">{slideDuration} seconds per slide</p>
-          </div>
-        </div>
-
         {/* Generate Button */}
         <div className="text-center pt-4">
           <button
