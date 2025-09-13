@@ -281,9 +281,31 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
     }
 
     // Create video recorder
-    const stream = canvas.captureStream(30); // 30 fps
-    const mediaRecorder = new MediaRecorder(stream, {
-      mimeType: 'video/webm;codecs=vp9'
+    let combinedStream: MediaStream;
+    
+    if (backgroundAudio) {
+      // Create audio context for mixing
+      const audioContext = new AudioContext();
+      const audioSource = audioContext.createMediaElementSource(backgroundAudio);
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = 0.3; // Set volume
+      
+      const destination = audioContext.createMediaStreamDestination();
+      audioSource.connect(gainNode);
+      gainNode.connect(destination);
+      
+      // Combine video and audio streams
+      const videoStream = canvas.captureStream(30);
+      combinedStream = new MediaStream([
+        ...videoStream.getVideoTracks(),
+        ...destination.stream.getAudioTracks()
+      ]);
+    } else {
+      combinedStream = canvas.captureStream(30);
+    }
+    
+    const mediaRecorder = new MediaRecorder(combinedStream, {
+      mimeType: 'video/webm;codecs=vp9,opus'
     });
 
     const chunks: BlobPart[] = [];
@@ -311,9 +333,12 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
     
     // Start background music
     if (backgroundAudio) {
-      backgroundAudio.play().catch(error => {
-        console.warn('Background music failed to play:', error);
-      });
+      // Ensure audio context is resumed (required by some browsers)
+      if (backgroundAudio.paused) {
+        backgroundAudio.play().catch(error => {
+          console.warn('Background music failed to play:', error);
+        });
+      }
     }
 
     // Animation parameters
