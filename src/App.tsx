@@ -32,11 +32,8 @@ const DEFAULT_CLASSES = [
 ];
 
 const MUSIC_TRACKS: MusicTrack[] = [
-  { id: '1', name: 'Energetic Workout', url: '/music/energetic-workout.mp3', duration: 45 },
-  { id: '2', name: 'Motivational Beat', url: '/music/motivational-beat.mp3', duration: 38 },
-  { id: '3', name: 'Uplifting Rhythm', url: '/music/uplifting-rhythm.mp3', duration: 42 },
-  { id: '4', name: 'Dynamic Flow', url: '/music/dynamic-flow.mp3', duration: 35 },
-  { id: '5', name: 'Power Training', url: '/music/power-training.mp3', duration: 50 }
+  // Note: Add your own music files to the public/music/ directory
+  // For now, using placeholder entries - you can add custom audio via the "Add Audio" button
 ];
 
 function App() {
