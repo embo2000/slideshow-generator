@@ -123,7 +123,7 @@ class GoogleDriveService {
         // Check if we have a file to save
         if (backgroundOption.image.file) {
           // Save background image to Drive Assets folder
-          const assetId = await this.saveAssetToDrive(backgroundOption.image.file, 'image');
+          const assetId = await this.saveAssetToDriveWithName(backgroundOption.image.file, 'image', 'Background Image');
           console.log('Background image saved to Drive with ID:', assetId);
           
           processedBackgroundOption = {
@@ -178,7 +178,7 @@ class GoogleDriveService {
       console.log('Processing background music file');
       try {
         // Save music file to Drive Assets folder
-        const assetId = await this.saveAssetToDrive(selectedMusic.file, 'audio');
+        const assetId = await this.saveAssetToDriveWithName(selectedMusic.file, 'audio', selectedMusic.name);
         console.log('Background music saved to Drive with ID:', assetId);
         
         processedSelectedMusic = {
@@ -617,7 +617,45 @@ class GoogleDriveService {
       name: driveFileName,
       parents: [assetsFolderId],
       mimeType: file.type,
-      description: file.name, // Store original filename in description
+      description: file.name, // This will be overridden by the caller with user-provided name
+    };
+
+    const form = new FormData();
+    form.append(
+      "metadata",
+      new Blob([JSON.stringify(metadata)], { type: "application/json" })
+    );
+    form.append("file", file);
+
+    const res = await fetch(
+      "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      }
+    );
+
+    if (!res.ok) {
+      throw new Error(`Failed to save asset: ${res.status}`);
+    }
+
+    const result = await res.json();
+    return result.id;
+  }
+
+  async saveAssetToDriveWithName(file: File, type: 'image' | 'audio', userProvidedName: string): Promise<string> {
+    const token = await this.getToken();
+    const assetsFolderId = await this.ensureAssetsFolder();
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const driveFileName = `${type}-${timestamp}-${file.name}`;
+
+    const metadata = {
+      name: driveFileName,
+      parents: [assetsFolderId],
+      mimeType: file.type,
+      description: userProvidedName, // Store user-provided name in description
     };
 
     const form = new FormData();
