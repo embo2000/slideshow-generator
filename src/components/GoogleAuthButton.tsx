@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LogIn, LogOut, User } from 'lucide-react';
+import { LogIn, LogOut, User, ChevronDown } from 'lucide-react';
 import { googleAuthService, GoogleUser } from '../services/googleAuth';
 
 interface GoogleAuthButtonProps {
@@ -11,6 +11,7 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({ onAuthChange }) => 
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
+  const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -66,6 +67,21 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({ onAuthChange }) => 
     }
   };
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.profile-dropdown')) {
+        setShowDropdown(false);
+      }
+    };
+
+    if (showDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showDropdown]);
+
   // Show error state if initialization failed
   if (initError) {
     return (
@@ -87,8 +103,11 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({ onAuthChange }) => 
 
   if (user) {
     return (
-      <div className="flex items-center space-x-3">
-        <div className="flex items-center space-x-2">
+      <div className="relative profile-dropdown">
+        <button
+          onClick={() => setShowDropdown(!showDropdown)}
+          className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+        >
           <img
             src={user.picture}
             alt={user.name}
@@ -98,15 +117,32 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({ onAuthChange }) => 
             <p className="text-sm font-medium text-gray-900">{user.name}</p>
             <p className="text-xs text-gray-500">{user.email}</p>
           </div>
-        </div>
-        <button
-          onClick={handleSignOut}
-          disabled={isLoading}
-          className="inline-flex items-center px-3 py-2 text-sm text-teal-700 hover:bg-teal-50 rounded-lg transition-colors disabled:opacity-50 border border-teal-200 hover:border-teal-300"
-        >
-          <LogOut className="h-4 w-4 mr-1" />
-          Sign Out
+          <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
         </button>
+
+        {showDropdown && (
+          <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+            <div className="px-4 py-2 border-b border-gray-100">
+              <p className="text-sm font-medium text-gray-900">{user.name}</p>
+              <p className="text-xs text-gray-500">{user.email}</p>
+            </div>
+            <button
+              onClick={() => {
+                handleSignOut();
+                setShowDropdown(false);
+              }}
+              disabled={isLoading}
+              className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+            >
+              {isLoading ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600 mr-2"></div>
+              ) : (
+                <LogOut className="h-4 w-4 mr-2" />
+              )}
+              Sign Out
+            </button>
+          </div>
+        )}
       </div>
     );
   }
