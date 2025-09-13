@@ -427,6 +427,65 @@ class GoogleDriveService {
       return [];
     }
   }
+
+  async listMusicFiles(): Promise<Array<{
+    id: string;
+    name: string;
+    url: string;
+    createdTime: string;
+    size?: string;
+  }>> {
+    try {
+      const token = await this.getToken();
+      const assetsFolderId = await this.ensureAssetsFolder();
+
+      const res = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+          `'${assetsFolderId}' in parents and mimeType contains 'audio/' and trashed=false`
+        )}&fields=files(id,name,createdTime,size)&orderBy=createdTime desc`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (!res.ok) {
+        console.error('Failed to list music files:', await res.text());
+        return [];
+      }
+
+      const data = await res.json();
+      const musicFiles = data.files || [];
+
+      // Generate URLs for each music file
+      const musicWithUrls = await Promise.all(
+        musicFiles.map(async (music: any) => {
+          try {
+            const url = await this.loadAssetFromDrive(music.id);
+            return {
+              id: music.id,
+              name: music.name,
+              url: url,
+              createdTime: music.createdTime,
+              size: music.size
+            };
+          } catch (error) {
+            console.error(`Failed to load URL for music ${music.name}:`, error);
+            return null;
+          }
+        })
+      );
 }
 
+      return musicWithUrls.filter(music => music !== null) as Array<{
+        id: string;
+        name: string;
+        url: string;
+        createdTime: string;
+        size?: string;
+      }>;
+    } catch (error) {
+      console.error('Failed to list music files:', error);
+      return [];
+    }
+  }
 export const googleDriveService = new GoogleDriveService();

@@ -461,6 +461,8 @@ const normalizeLoadedClassData = (loaded: any) => {
           selectedTrack={selectedMusic}
           weeklyTrack={weeklyMusic}
           onSelectTrack={setSelectedMusic}
+          existingMusicFiles={existingMusicFiles}
+          onLoadExistingMusic={handleLoadExistingMusic}
         />
       );
     } else if (currentStep === classes.length + 3) {
