@@ -35,6 +35,18 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
+  const getTotalPhotos = () => {
+    return Object.values(classData).reduce((total, photos) => total + photos.length, 0);
+  };
+
+  const getClassesWithPhotos = () => {
+    return Object.entries(classData).filter(([_, photos]) => photos.length > 0);
+  };
+
+  const getTotalDuration = () => {
+    return Math.round((getTotalPhotos() * slideDuration) / 60 * 10) / 10; // Convert to minutes, round to 1 decimal
+  };
+
   // Auto-save when component mounts or when slideshow name changes
   useEffect(() => {
     const performAutoSave = async () => {
@@ -68,18 +80,6 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
     
     return () => clearTimeout(timeoutId);
   }, [slideshowName, onAutoSave, getTotalPhotos]);
-
-  const getTotalPhotos = () => {
-    return Object.values(classData).reduce((total, photos) => total + photos.length, 0);
-  };
-
-  const getClassesWithPhotos = () => {
-    return Object.entries(classData).filter(([_, photos]) => photos.length > 0);
-  };
-
-  const getTotalDuration = () => {
-    return Math.round((getTotalPhotos() * slideDuration) / 60 * 10) / 10; // Convert to minutes, round to 1 decimal
-  };
 
   return (
     <WizardStepWrapper
