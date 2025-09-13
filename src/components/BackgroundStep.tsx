@@ -345,22 +345,3 @@ const BackgroundStep: React.FC<BackgroundStepProps> = ({
 };
 
 export default BackgroundStep;
-              >
-                <Upload className="h-5 w-5 mr-2" />
-                Choose Image
-              </button>
-            </div>
-            
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <p className="text-blue-800 text-sm">
-                <strong>Optional:</strong> You can skip this step to use the default gradient background
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-    </WizardStepWrapper>
-  );
-};
-
-export default BackgroundStep;
