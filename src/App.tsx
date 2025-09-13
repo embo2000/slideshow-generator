@@ -47,7 +47,7 @@ const MUSIC_TRACKS: MusicTrack[] = [
   {
     id: 'sample-3',
     name: 'Energetic Beat',
-    url: 'https://file-examples.com/storage/fe68c1b7c66d5b2c2daa694/2017/11/file_example_MP3_1MG.mp3', 
+    url: 'https://www.kozco.com/tech/piano2-CoolEdit.mp3',
     duration: 33
   },
   {
