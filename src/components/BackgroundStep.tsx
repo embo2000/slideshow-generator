@@ -130,6 +130,7 @@ const BackgroundStep: React.FC<BackgroundStepProps> = ({
                 src={backgroundOption.image.url}
                 alt="Background"
                 className="w-full h-64 object-cover rounded-lg border shadow-sm"
+                style={{ opacity: backgroundOption.image.opacity || 0.8 }}
               />
               <button
                 onClick={removeBackground}
