@@ -48,12 +48,28 @@ function App() {
   const [slideDuration, setSlideDuration] = useState(3); // Default 3 seconds per slide
   const [slideshowName, setSlideshowName] = useState(() => {
     const today = new Date();
-    const year = today.getFullYear();
+    const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Convert Sunday to 6, others to dayOfWeek - 1
+    
+    // Get Monday of current week
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - daysFromMonday);
+    
+    // Get Sunday of current week
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const month = monthNames[today.getMonth()];
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    
+    const formatDate = (date: Date) => {
+      const month = monthNames[date.getMonth()];
+      const day = String(date.getDate()).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${month} ${day}, ${year}`;
+    };
+    
+    return `${formatDate(monday)} to ${formatDate(sunday)}`;
   });
   const [existingMusicFiles, setExistingMusicFiles] = useState<Array<{
     id: string;
