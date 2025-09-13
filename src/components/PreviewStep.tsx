@@ -47,10 +47,15 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
     return Math.round((getTotalPhotos() * slideDuration) / 60 * 10) / 10; // Convert to minutes, round to 1 decimal
   };
 
-  // Auto-save when component mounts or when slideshow name changes
+  // Auto-save when slideshow name changes (with debouncing)
   useEffect(() => {
+    // Don't auto-save if no slideshow name, no photos, or already saving
+    if (!slideshowName.trim() || getTotalPhotos() === 0 || isAutoSaving) {
+      return;
+    }
+
     const performAutoSave = async () => {
-      if (!onAutoSave || !slideshowName.trim() || getTotalPhotos() === 0) return;
+      if (!onAutoSave) return;
       
       setIsAutoSaving(true);
       setAutoSaveStatus('saving');
@@ -71,15 +76,11 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
       }
     };
 
-    // Debounce auto-save when slideshow name changes (only if there are photos)
-    const timeoutId = setTimeout(() => {
-      if (getTotalPhotos() > 0) {
-        performAutoSave();
-      }
-    }, 2000); // Increased debounce time to 2 seconds
+    // Debounce auto-save - only trigger after user stops typing for 3 seconds
+    const timeoutId = setTimeout(performAutoSave, 3000);
     
     return () => clearTimeout(timeoutId);
-  }, [slideshowName, onAutoSave, getTotalPhotos]);
+  }, [slideshowName]); // Only depend on slideshowName to avoid infinite loops
 
   return (
     <WizardStepWrapper
