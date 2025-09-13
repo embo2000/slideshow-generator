@@ -369,6 +369,7 @@ const normalizeLoadedClassData = (loaded: any) => {
           slideshowName={slideshowName}
           onSlideshowNameChange={setSlideshowName}
           onAutoSave={handleAutoSave}
+          classes={classes}
         />
       );
     }

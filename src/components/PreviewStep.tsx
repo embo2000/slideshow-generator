@@ -15,6 +15,7 @@ interface PreviewStepProps {
   slideshowName: string;
   onSlideshowNameChange: (name: string) => void;
   onAutoSave?: () => Promise<void>;
+  classes: string[];
 }
 
 const PreviewStep: React.FC<PreviewStepProps> = ({
@@ -29,6 +30,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
   slideshowName,
   onSlideshowNameChange,
   onAutoSave
+  classes
 }) => {
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -270,14 +272,14 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-gray-900">Music Selection</h4>
               <button
-                onClick={() => onEdit(getClassesWithPhotos().length + 2)}
+                onClick={() => onEdit(classes.length + 2)}
                 className="text-blue-600 hover:text-blue-700 text-sm"
               >
                 Edit
               </button>
             </div>
             <p className="text-sm text-gray-600">
-              {selectedMusic?.name || 'No background music'}
+              {selectedMusic?.name || 'No music selected'}
             </p>
           </div>
 
@@ -285,7 +287,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-gray-900">Background</h4>
               <button
-                onClick={() => onEdit(getClassesWithPhotos().length + 1)}
+                onClick={() => onEdit(classes.length + 1)}
                 className="text-blue-600 hover:text-blue-700 text-sm"
               >
                 Edit
@@ -304,7 +306,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-gray-900">Transitions</h4>
               <button
-                onClick={() => onEdit(getClassesWithPhotos().length)}
+                onClick={() => onEdit(classes.length)}
                 className="text-blue-600 hover:text-blue-700 text-sm"
               >
                 Edit
