@@ -41,7 +41,7 @@ const WizardNavigation: React.FC<WizardNavigationProps> = ({
             <button
               onClick={onGenerate}
               disabled={!canProceed}
-              className="inline-flex items-center px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-lg font-medium transition-colors duration-200"
+              className="inline-flex items-center px-6 py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-300 text-white rounded-lg font-medium transition-colors duration-200"
             >
               <Play className="h-4 w-4 mr-2" />
               Generate Video
@@ -50,7 +50,7 @@ const WizardNavigation: React.FC<WizardNavigationProps> = ({
             <button
               onClick={onNext}
               disabled={!canProceed}
-              className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-lg font-medium transition-colors duration-200"
+              className="inline-flex items-center px-4 py-2 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-300 text-white rounded-lg font-medium transition-colors duration-200"
             >
               Next
               <ChevronRight className="h-4 w-4 ml-2" />

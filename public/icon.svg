@@ -1,19 +1,36 @@
-<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Main frame -->
-  <rect x="2" y="6" width="28" height="20" rx="2" stroke="#00D4AA" stroke-width="2" fill="none"/>
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="512" height="512" rx="64" fill="#00D4AA"/>
   
-  <!-- Side panels -->
-  <rect x="1" y="4" width="2" height="24" rx="1" fill="#00D4AA"/>
-  <rect x="29" y="4" width="2" height="24" rx="1" fill="#00D4AA"/>
+  <!-- Main image frame -->
+  <rect x="64" y="128" width="384" height="256" rx="16" fill="white" stroke="#00BCD4" stroke-width="8"/>
   
-  <!-- Additional side elements -->
-  <rect x="4" y="2" width="2" height="28" rx="1" fill="#00D4AA"/>
-  <rect x="26" y="2" width="2" height="28" rx="1" fill="#00D4AA"/>
+  <!-- Film strips on sides -->
+  <rect x="32" y="96" width="16" height="320" rx="8" fill="#00BCD4"/>
+  <rect x="464" y="96" width="16" height="320" rx="8" fill="#00BCD4"/>
   
-  <!-- Sun/circle -->
-  <circle cx="16" cy="12" r="3" stroke="#00D4AA" stroke-width="2" fill="none"/>
+  <!-- Film strip holes -->
+  <rect x="24" y="112" width="8" height="24" rx="4" fill="#00D4AA"/>
+  <rect x="24" y="152" width="8" height="24" rx="4" fill="#00D4AA"/>
+  <rect x="24" y="192" width="8" height="24" rx="4" fill="#00D4AA"/>
+  <rect x="24" y="232" width="8" height="24" rx="4" fill="#00D4AA"/>
+  <rect x="24" y="272" width="8" height="24" rx="4" fill="#00D4AA"/>
+  <rect x="24" y="312" width="8" height="24" rx="4" fill="#00D4AA"/>
+  <rect x="24" y="352" width="8" height="24" rx="4" fill="#00D4AA"/>
   
-  <!-- Mountains/landscape -->
-  <path d="M8 20 L12 16 L16 18 L20 14 L24 18 L24 24 L8 24 Z" fill="#00D4AA" opacity="0.3"/>
-  <path d="M8 20 L12 16 L16 18 L20 14 L24 18" stroke="#00D4AA" stroke-width="2" fill="none" stroke-linejoin="round"/>
+  <rect x="480" y="112" width="8" height="24" rx="4" fill="#00D4AA"/>
+  <rect x="480" y="152" width="8" height="24" rx="4" fill="#00D4AA"/>
+  <rect x="480" y="192" width="8" height="24" rx="4" fill="#00D4AA"/>
+  <rect x="480" y="232" width="8" height="24" rx="4" fill="#00D4AA"/>
+  <rect x="480" y="272" width="8" height="24" rx="4" fill="#00D4AA"/>
+  <rect x="480" y="312" width="8" height="24" rx="4" fill="#00D4AA"/>
+  <rect x="480" y="352" width="8" height="24" rx="4" fill="#00D4AA"/>
+  
+  <!-- Sun -->
+  <circle cx="160" cy="192" r="24" fill="#00BCD4"/>
+  <circle cx="160" cy="192" r="16" fill="white"/>
+  
+  <!-- Mountains -->
+  <path d="M96 320 L160 240 L224 280 L288 200 L352 240 L416 320 Z" fill="#00BCD4"/>
+  <path d="M96 320 L160 240 L224 280 L288 200 L352 240 L416 320 Z" fill="#00D4AA" fill-opacity="0.3"/>
 </svg>

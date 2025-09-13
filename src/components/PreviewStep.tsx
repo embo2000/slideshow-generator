@@ -144,58 +144,58 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+          <div className="bg-cyan-50 p-4 rounded-lg border border-cyan-200">
             <div className="flex items-center space-x-2 mb-2">
-              <Camera className="h-5 w-5 text-blue-600" />
-              <span className="font-medium text-blue-900">Photos</span>
+              <Camera className="h-5 w-5 text-cyan-600" />
+              <span className="font-medium text-cyan-900">Photos</span>
             </div>
-            <div className="text-2xl font-bold text-blue-600">{getTotalPhotos()}</div>
-            <div className="text-sm text-blue-700">{getClassesWithPhotos().length} groups</div>
+            <div className="text-2xl font-bold text-cyan-600">{getTotalPhotos()}</div>
+            <div className="text-sm text-cyan-700">{getClassesWithPhotos().length} groups</div>
           </div>
 
-          <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+          <div className="bg-teal-50 p-4 rounded-lg border border-teal-200">
             <div className="flex items-center space-x-2 mb-2">
-              <Music className="h-5 w-5 text-orange-600" />
-              <span className="font-medium text-orange-900">Music</span>
+              <Music className="h-5 w-5 text-teal-600" />
+              <span className="font-medium text-teal-900">Music</span>
             </div>
-            <div className="text-sm font-semibold text-orange-600">
+            <div className="text-sm font-semibold text-teal-600">
               {selectedMusic?.name || 'No music'}
             </div>
-            <div className="text-sm text-orange-700">
+            <div className="text-sm text-teal-700">
               {selectedMusic ? `${selectedMusic.duration}s` : 'Silent'}
             </div>
           </div>
 
-          <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+          <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
             <div className="flex items-center space-x-2 mb-2">
-              <ImageIcon className="h-5 w-5 text-purple-600" />
-              <span className="font-medium text-purple-900">Background</span>
+              <ImageIcon className="h-5 w-5 text-emerald-600" />
+              <span className="font-medium text-emerald-900">Background</span>
             </div>
-            <div className="text-sm font-semibold text-purple-600">
+            <div className="text-sm font-semibold text-emerald-600">
               {backgroundOption.type === 'image' ? 'Custom Image' : 
                backgroundOption.type === 'color' ? 'Solid Color' : 'Default Gradient'}
             </div>
           </div>
 
-          <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+          <div className="bg-cyan-50 p-4 rounded-lg border border-cyan-200">
             <div className="flex items-center space-x-2 mb-2">
-              <Zap className="h-5 w-5 text-indigo-600" />
-              <span className="font-medium text-indigo-900">Transitions</span>
+              <Zap className="h-5 w-5 text-cyan-600" />
+              <span className="font-medium text-cyan-900">Transitions</span>
             </div>
-            <div className="text-sm font-semibold text-indigo-600">
+            <div className="text-sm font-semibold text-cyan-600">
               {selectedTransition.name}
             </div>
           </div>
 
-          <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+          <div className="bg-teal-50 p-4 rounded-lg border border-teal-200">
             <div className="flex items-center space-x-2 mb-2">
-              <Clock className="h-5 w-5 text-green-600" />
-              <span className="font-medium text-green-900">Duration</span>
+              <Clock className="h-5 w-5 text-teal-600" />
+              <span className="font-medium text-teal-900">Duration</span>
             </div>
-            <div className="text-sm font-semibold text-green-600">
+            <div className="text-sm font-semibold text-teal-600">
               {slideDuration}s per slide
             </div>
-            <div className="text-sm text-green-700">
+            <div className="text-sm text-teal-700">
               ~{getTotalDuration()} min total
             </div>
           </div>
@@ -334,7 +334,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
         <div className="text-center pt-4">
           <button
             onClick={onGenerate}
-            className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg font-semibold text-lg transition-all duration-200 shadow-lg transform hover:scale-105"
+            className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white rounded-lg font-semibold text-lg transition-all duration-200 shadow-lg transform hover:scale-105"
           >
             <Play className="h-6 w-6 mr-3" />
             Generate Slideshow Video

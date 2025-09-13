@@ -603,7 +603,7 @@ const normalizeLoadedClassData = (loaded: any) => {
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-blue-600 rounded-lg">
+              <div className="p-2 bg-teal-500 rounded-lg">
                 <Camera className="h-6 w-6 text-white" />
               </div>
               <div>

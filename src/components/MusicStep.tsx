@@ -220,9 +220,9 @@ const MusicStep: React.FC<MusicStepProps> = ({
         {existingMusicFiles.length > 0 && (
           <div className="space-y-4">
             <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <Music className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-              <h3 className="font-medium text-blue-900 mb-1">Choose from Your Music Library</h3>
-              <p className="text-sm text-blue-700">
+              <Music className="h-8 w-8 text-teal-600 mx-auto mb-2" />
+              <h3 className="font-medium text-teal-900 mb-1">Choose from Your Music Library</h3>
+              <p className="text-sm text-teal-700">
                 Select from your previously uploaded music files or add new ones below
               </p>
             </div>
@@ -231,12 +231,12 @@ const MusicStep: React.FC<MusicStepProps> = ({
               {existingMusicFiles.map((music) => (
                 <div
                   key={music.id}
-                  className="p-4 rounded-lg border-2 border-gray-200 hover:border-blue-500 cursor-pointer transition-all duration-200 bg-white hover:bg-blue-50"
+                  className="p-4 rounded-lg border-2 border-gray-200 hover:border-teal-500 cursor-pointer transition-all duration-200 bg-white hover:bg-teal-50"
                   onClick={() => onLoadExistingMusic?.(music)}
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-3">
-                      <div className="p-2 rounded-lg bg-blue-100 text-blue-600">
+                      <div className="p-2 rounded-lg bg-teal-100 text-teal-600">
                         <Music className="h-5 w-5" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -269,7 +269,7 @@ const MusicStep: React.FC<MusicStepProps> = ({
                         className="p-2 hover:bg-white rounded-full transition-colors"
                       >
                         {playingTrack === `preview-${music.id}` ? (
-                          <Pause className="h-4 w-4 text-blue-600" />
+                          <Pause className="h-4 w-4 text-teal-600" />
                         ) : (
                           <Play className="h-4 w-4 text-gray-600" />
                         )}
@@ -278,7 +278,7 @@ const MusicStep: React.FC<MusicStepProps> = ({
                   </div>
                   
                   <div className="text-center">
-                    <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
+                    <span className="text-xs px-2 py-1 bg-teal-100 text-teal-700 rounded-full">
                       Click to use this music
                     </span>
                   </div>
@@ -302,7 +302,7 @@ const MusicStep: React.FC<MusicStepProps> = ({
                 key={track.id}
                 className={`p-6 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
                   selectedTrack?.id === track.id
-                    ? 'border-orange-500 bg-orange-50 shadow-md'
+                    ? 'border-teal-500 bg-teal-50 shadow-md'
                     : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                 }`}
                 onClick={() => onSelectTrack(track)}
@@ -311,14 +311,14 @@ const MusicStep: React.FC<MusicStepProps> = ({
                   <div className="flex items-center space-x-3">
                     <div className={`p-2 rounded-lg ${
                       selectedTrack?.id === track.id
-                        ? 'bg-orange-100 text-orange-600'
+                        ? 'bg-teal-100 text-teal-600'
                         : 'bg-gray-100 text-gray-600'
                     }`}>
                       <Music className="h-5 w-5" />
                     </div>
                     <div>
                       <h3 className="font-semibold text-gray-900">{track.name}</h3>
-                      <span className="text-xs text-blue-600 font-medium">Custom Audio</span>
+                      <span className="text-xs text-teal-600 font-medium">Custom Audio</span>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -330,7 +330,7 @@ const MusicStep: React.FC<MusicStepProps> = ({
                       className="p-2 hover:bg-white rounded-full transition-colors"
                     >
                       {playingTrack === track.id ? (
-                        <Pause className="h-5 w-5 text-orange-600" />
+                        <Pause className="h-5 w-5 text-teal-600" />
                       ) : (
                         <Play className="h-5 w-5 text-gray-600" />
                       )}
@@ -353,7 +353,7 @@ const MusicStep: React.FC<MusicStepProps> = ({
                 </div>
                 
                 {selectedTrack?.id === track.id && (
-                  <div className="mt-3 text-sm font-medium text-orange-600">
+                  <div className="mt-3 text-sm font-medium text-teal-600">
                     ✓ Selected
                   </div>
                 )}
@@ -380,7 +380,7 @@ const MusicStep: React.FC<MusicStepProps> = ({
           <div className="flex items-center justify-end mb-4">
             <button
               onClick={() => setShowAddOptions(!showAddOptions)}
-              className="inline-flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+             className="inline-flex items-center px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium transition-colors"
             >
               <Plus className="h-4 w-4 mr-1" />
               Add Audio
@@ -430,7 +430,7 @@ const MusicStep: React.FC<MusicStepProps> = ({
                   <button
                     onClick={handleUrlAdd}
                     disabled={!audioUrl.trim() || !audioName.trim()}
-                    className="w-full inline-flex items-center justify-center px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition-colors"
+                    className="w-full inline-flex items-center justify-center px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition-colors"
                   >
                     <Link className="h-4 w-4 mr-2" />
                     Add URL
@@ -488,7 +488,7 @@ const MusicStep: React.FC<MusicStepProps> = ({
                   <button
                     onClick={confirmFileUpload}
                     disabled={!pendingFileName.trim()}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-lg font-medium transition-colors"
+                    className="px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-300 text-white rounded-lg font-medium transition-colors"
                   >
                     Add Track
                   </button>

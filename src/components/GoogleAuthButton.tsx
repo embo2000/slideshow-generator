@@ -79,7 +79,7 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({ onAuthChange }) => 
   if (isInitializing) {
     return (
       <div className="flex items-center space-x-2 text-gray-500">
-        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-cyan-600"></div>
         <span className="text-sm">Initializing...</span>
       </div>
     );
@@ -115,7 +115,7 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({ onAuthChange }) => 
     <button
       onClick={handleSignIn}
       disabled={isLoading || isInitializing || !!initError}
-      className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+      className="inline-flex items-center px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
     >
       {isLoading ? (
         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>

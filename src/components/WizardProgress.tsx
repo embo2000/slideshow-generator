@@ -28,9 +28,9 @@ const WizardProgress: React.FC<WizardProgressProps> = ({
               >
                 <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-200 ${
                   index < currentStep 
-                    ? 'bg-green-500 border-green-500 text-white' 
+                    ? 'bg-teal-500 border-teal-500 text-white' 
                     : index === currentStep
-                    ? 'bg-blue-500 border-blue-500 text-white'
+                    ? 'bg-cyan-500 border-cyan-500 text-white'
                     : 'bg-gray-100 border-gray-300 text-gray-500'
                 }`}>
                   {index < currentStep ? (
@@ -57,7 +57,7 @@ const WizardProgress: React.FC<WizardProgressProps> = ({
         <div className="mt-4">
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div 
-              className="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full transition-all duration-500"
+              className="bg-gradient-to-r from-cyan-500 to-teal-500 h-2 rounded-full transition-all duration-500"
               style={{ width: `${((currentStep + 1) / totalSteps) * 100}%` }}
             />
           </div>
