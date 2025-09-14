@@ -670,38 +670,80 @@ class GoogleDriveService {
     const token = await this.getToken();
     const assetsFolderId = await this.ensureAssetsFolder();
 
+    // Check if an asset with the same user-provided name already exists
+    const searchRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+        `'${assetsFolderId}' in parents and description='${userProvidedName}' and mimeType contains '${type}/' and trashed=false`
+      )}&fields=files(id,name)`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    const searchData = await searchRes.json();
+    const existingFileId = searchData.files?.[0]?.id;
+
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const driveFileName = `${type}-${timestamp}-${file.name}`;
 
     const metadata = {
       name: driveFileName,
-      parents: [assetsFolderId],
+      ...(existingFileId ? {} : { parents: [assetsFolderId] }),
       mimeType: file.type,
       description: userProvidedName, // Store user-provided name in description
     };
 
-    const form = new FormData();
-    form.append(
-      "metadata",
-      new Blob([JSON.stringify(metadata)], { type: "application/json" })
-    );
-    form.append("file", file);
+    // Use multipart upload for both create and update
+    const boundary = "-------314159265358979323846";
+    const delimiter = `\r\n--${boundary}\r\n`;
+    const closeDelim = `\r\n--${boundary}--`;
 
-    const res = await fetch(
-      "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: form,
-      }
-    );
+    // Convert file to base64 for multipart upload
+    const fileBase64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(result.split(",")[1]); // Remove data URL prefix
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    const body =
+      delimiter +
+      "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
+      JSON.stringify(metadata) +
+      delimiter +
+      `Content-Type: ${file.type}\r\nContent-Transfer-Encoding: base64\r\n\r\n` +
+      fileBase64 +
+      closeDelim;
+
+    // Use PATCH for existing files, POST for new files
+    const url = existingFileId
+      ? `https://www.googleapis.com/upload/drive/v3/files/${existingFileId}?uploadType=multipart`
+      : "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart";
+    
+    const method = existingFileId ? "PATCH" : "POST";
+
+    const res = await fetch(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": `multipart/related; boundary=${boundary}`,
+      },
+      body,
+    });
 
     if (!res.ok) {
-      throw new Error(`Failed to save asset: ${res.status}`);
+      const errorText = await res.text();
+      console.error('Drive API error:', res.status, errorText);
+      throw new Error(`Failed to ${existingFileId ? 'update' : 'save'} asset: ${res.status} ${errorText}`);
     }
 
     const result = await res.json();
-    return result.id;
+    const fileId = existingFileId || result.id;
+    console.log(`Asset ${existingFileId ? 'updated' : 'saved'} successfully with ID:`, fileId, 'Name:', userProvidedName);
+    return fileId;
   }
 
   async loadAssetFromDrive(assetId: string): Promise<string> {
