@@ -95,6 +95,20 @@ class GoogleDriveService {
     const token = await this.getToken();
     const folderId = await this.ensureFolder();
 
+    // Check if a file with the same name already exists
+    const fileName = `${name}.json`;
+    const searchRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+        `name='${fileName}' and '${folderId}' in parents and trashed=false`
+      )}&fields=files(id)`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    const searchData = await searchRes.json();
+    const existingFileId = searchData.files?.[0]?.id;
+
     // Convert files to base64
     const fileToBase64 = (file: File) =>
       new Promise<string>((resolve, reject) => {
@@ -214,7 +228,7 @@ class GoogleDriveService {
 
     const metadata = {
       name: `${name}.json`,
-      parents: [folderId],
+      ...(existingFileId ? {} : { parents: [folderId] }),
       mimeType: "application/json",
     };
 
@@ -231,10 +245,17 @@ class GoogleDriveService {
       JSON.stringify(slideshowData) +
       closeDelim;
 
+    // Use PATCH for existing files, POST for new files
+    const url = existingFileId
+      ? `https://www.googleapis.com/upload/drive/v3/files/${existingFileId}?uploadType=multipart`
+      : "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart";
+    
+    const method = existingFileId ? "PATCH" : "POST";
+
     const res = await fetch(
-      "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+      url,
       {
-        method: "POST",
+        method,
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": `multipart/related; boundary=${boundary}`,
@@ -249,8 +270,9 @@ class GoogleDriveService {
       throw new Error(`Failed to save slideshow: ${res.status} ${errorText}`);
     }
     const result = await res.json();
-    console.log('Slideshow saved successfully with ID:', result.id);
-    return result.id;
+    const fileId = existingFileId || result.id;
+    console.log(`Slideshow ${existingFileId ? 'updated' : 'saved'} successfully with ID:`, fileId);
+    return fileId;
   }
 
   async loadSlideshow(fileId: string): Promise<SlideshowData> {
