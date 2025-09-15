@@ -552,6 +552,52 @@ const normalizeLoadedClassData = (loaded: any) => {
     setShowVideoGenerator(true);
   };
 
+  const handleNewSlideshow = () => {
+    if (getTotalPhotos() > 0 || selectedMusic || backgroundOption.type !== 'none') {
+      const confirmReset = window.confirm(
+        'Are you sure you want to start a new slideshow? This will clear all current photos, music, and settings.'
+      );
+      if (!confirmReset) return;
+    }
+
+    // Reset all slideshow data
+    const newClassData: ClassData = {};
+    classes.forEach(className => {
+      newClassData[className] = [];
+    });
+    
+    setClassData(newClassData);
+    setSelectedMusic(null);
+    setWeeklyMusic(null);
+    setBackgroundOption({ type: 'none' });
+    setSelectedTransition(TRANSITION_TYPES[0]);
+    setSlideDuration(3);
+    setCustomMusicTracks([]);
+    setCurrentStep(0);
+    
+    // Generate new default slideshow name
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - daysFromMonday);
+    
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    const formatDate = (date: Date) => {
+      const month = monthNames[date.getMonth()];
+      const day = String(date.getDate()).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${month} ${day}, ${year}`;
+    };
+    
+    setSlideshowName(`${formatDate(monday)} to ${formatDate(sunday)}`);
+  };
   const renderCurrentStep = () => {
     if (currentStep < classes.length) {
       // Image group upload steps
@@ -648,6 +694,16 @@ const normalizeLoadedClassData = (loaded: any) => {
             </div>
             
             <div className="flex items-center space-x-4">
+              <button
+                onClick={handleNewSlideshow}
+                className="inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors duration-200 shadow-sm"
+                title="Start a new slideshow from scratch"
+              >
+                <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                New Slideshow
+              </button>
               <GoogleAuthButton 
                 onAuthChange={setCurrentUser}
                 onShowSettings={() => setShowSettings(true)}
