@@ -673,9 +673,9 @@ const normalizeLoadedClassData = (loaded: any) => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <button 
-                onClick={() => setCurrentStep(0)}
+                onClick={handleNewSlideshow}
                 className="p-2 bg-teal-500 hover:bg-teal-600 rounded-lg transition-colors cursor-pointer"
-                title="Go to first step"
+                title="Start a new slideshow from scratch"
               >
                 <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
                   <rect x="2" y="4" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="2" fill="none"/>
