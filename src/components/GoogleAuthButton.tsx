@@ -18,6 +18,7 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
   const [isInitializing, setIsInitializing] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [sessionStatus, setSessionStatus] = useState<'active' | 'expiring' | 'expired'>('active');
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -43,6 +44,45 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
 
     initializeAuth();
   }, [onAuthChange]);
+
+  // Monitor session status
+  useEffect(() => {
+    if (!user) {
+      setSessionStatus('expired');
+      return;
+    }
+
+    const checkSessionStatus = () => {
+      const tokenInfo = localStorage.getItem('google_token_info');
+      if (!tokenInfo) {
+        setSessionStatus('expired');
+        return;
+      }
+
+      try {
+        const info = JSON.parse(tokenInfo);
+        const now = Date.now();
+        const timeLeft = info.expires_at - now;
+        
+        if (timeLeft <= 0) {
+          setSessionStatus('expired');
+        } else if (timeLeft <= 600000) { // 10 minutes left
+          setSessionStatus('expiring');
+        } else {
+          setSessionStatus('active');
+        }
+      } catch {
+        setSessionStatus('expired');
+      }
+    };
+
+    // Check immediately
+    checkSessionStatus();
+    
+    // Check every minute
+    const interval = setInterval(checkSessionStatus, 60000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   const handleSignIn = async () => {
     setIsLoading(true);
@@ -112,17 +152,35 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
       <div className="relative profile-dropdown">
         <button
           onClick={() => setShowDropdown(!showDropdown)}
-          className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          className={`flex items-center space-x-2 p-2 hover:bg-gray-100 rounded-lg transition-colors ${
+            sessionStatus === 'expiring' ? 'ring-2 ring-yellow-400' : 
+            sessionStatus === 'expired' ? 'ring-2 ring-red-400' : ''
+          }`}
         >
           <img
             src={user.picture}
             alt={user.name}
-            className="w-8 h-8 rounded-full"
+            className={`w-8 h-8 rounded-full ${
+              sessionStatus === 'expiring' ? 'ring-2 ring-yellow-400' : 
+              sessionStatus === 'expired' ? 'ring-2 ring-red-400' : ''
+            }`}
           />
           <div className="hidden sm:block">
             <p className="text-sm font-medium text-gray-900">{user.name}</p>
-            <p className="text-xs text-gray-500">{user.email}</p>
+            <p className={`text-xs ${
+              sessionStatus === 'expiring' ? 'text-yellow-600' : 
+              sessionStatus === 'expired' ? 'text-red-600' : 'text-gray-500'
+            }`}>
+              {sessionStatus === 'expiring' ? 'Session expiring soon' :
+               sessionStatus === 'expired' ? 'Session expired' : user.email}
+            </p>
           </div>
+          {sessionStatus === 'expiring' && (
+            <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+          )}
+          {sessionStatus === 'expired' && (
+            <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+          )}
           <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
         </button>
 
@@ -130,8 +188,26 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
           <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
             <div className="px-4 py-2 border-b border-gray-100">
               <p className="text-sm font-medium text-gray-900">{user.name}</p>
-              <p className="text-xs text-gray-500">{user.email}</p>
+              <p className={`text-xs ${
+                sessionStatus === 'expiring' ? 'text-yellow-600' : 
+                sessionStatus === 'expired' ? 'text-red-600' : 'text-gray-500'
+              }`}>
+                {sessionStatus === 'expiring' ? 'Session expiring soon - please save your work' :
+                 sessionStatus === 'expired' ? 'Session expired - please sign in again' : user.email}
+              </p>
             </div>
+            {sessionStatus !== 'active' && (
+              <button
+                onClick={() => {
+                  handleSignIn();
+                  setShowDropdown(false);
+                }}
+                className="w-full flex items-center px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 transition-colors"
+              >
+                <LogIn className="h-4 w-4 mr-2" />
+                Refresh Session
+              </button>
+            )}
             <button
               onClick={() => {
                 onShowSlideshowManager?.();
