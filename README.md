@@ -48,44 +48,6 @@ VITE_GOOGLE_API_KEY=your_google_api_key_here
 
 4. Open your browser and start creating slideshows!
 
-## Heroku Deployment
-
-To deploy this application to Heroku:
-
-1. **Prerequisites:**
-   - Install [Heroku CLI](https://devcenter.heroku.com/articles/heroku-cli)
-   - Have a Heroku account
-   - Set up Google API credentials
-
-2. **Deploy Steps:**
-   ```bash
-   # Login to Heroku
-   heroku login
-   
-   # Create a new Heroku app
-   heroku create your-slideshow-app-name
-   
-   # Set environment variables
-   heroku config:set VITE_GOOGLE_CLIENT_ID=your_google_client_id
-   heroku config:set VITE_GOOGLE_API_KEY=your_google_api_key
-   
-   # Deploy the application
-   git add .
-   git commit -m "Deploy to Heroku"
-   git push heroku main
-   ```
-
-3. **Important Notes:**
-   - The app will automatically build during deployment (`heroku-postbuild` script)
-   - Make sure to add your Heroku app URL to Google OAuth authorized origins
-   - Environment variables must be set in Heroku dashboard or via CLI
-
-4. **Google OAuth Setup for Heroku:**
-   - Go to [Google Cloud Console](https://console.cloud.google.com/)
-   - Add your Heroku app URL (e.g., `https://your-app.herokuapp.com`) to:
-     - Authorized JavaScript origins
-     - Authorized redirect URIs
-
 ## Usage
 
 1. **Sign in** with your Google account (optional, but required for saving)
