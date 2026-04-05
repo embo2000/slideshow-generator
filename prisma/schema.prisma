@@ -35,15 +35,18 @@ model Slideshow {
 
 model Asset {
   id               String    @id @default(cuid())
+  ownerEmail       String?
   kind             AssetKind
   name             String
   originalFileName String
   mimeType         String
   size             Int
-  s3Key            String    @unique
+  s3Key            String
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
+  @@unique([ownerEmail, s3Key])
+  @@index([s3Key])
   @@index([kind, createdAt(sort: Desc)])
 }
 

@@ -128,11 +128,33 @@ const displayNameFromFileName = (fileName = "") => {
   return withoutExt.replace(/[_-]+/g, " ").trim() || fileName;
 };
 
-const findAssetByIdOrKey = async (idOrKey) => {
+const findAssetByIdOrKey = async (idOrKey, ownerEmail = null) => {
   let asset = await prisma.asset.findUnique({ where: { id: idOrKey } });
   if (asset) return asset;
-  asset = await prisma.asset.findUnique({ where: { s3Key: idOrKey } });
+  asset = await prisma.asset.findFirst({
+    where: {
+      s3Key: idOrKey,
+      ...(ownerEmail ? { ownerEmail } : {}),
+    },
+    orderBy: { createdAt: "desc" },
+  });
   return asset;
+};
+
+const ensureAudioAssetOwnership = (req, res, asset) => {
+  if (!asset || asset.kind !== "audio") {
+    return true;
+  }
+
+  const ownerEmail = requireUserEmail(req, res);
+  if (!ownerEmail) {
+    return false;
+  }
+  if (asset.ownerEmail !== ownerEmail) {
+    res.status(404).json({ error: "Asset not found" });
+    return false;
+  }
+  return true;
 };
 
 const getValidUploadLink = async (token) => {
@@ -402,6 +424,7 @@ app.post(`${apiPrefix}/intake/:token/upload`, intakeUpload.array("files", 20), a
 
     const asset = await prisma.asset.create({
       data: {
+        ownerEmail: tokenOwnerEmail,
         kind: "photo",
         name: file.originalname,
         originalFileName: file.originalname,
@@ -452,6 +475,10 @@ app.post(`${apiPrefix}/assets/upload`, upload.single("file"), async (req, res) =
     if (!["image", "audio", "photo", "video"].includes(kind)) {
       return res.status(400).json({ error: "kind must be image, audio, photo, or video" });
     }
+    const ownerEmail = getRequestUserEmail(req);
+    if (kind === "audio" && !ownerEmail) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
 
     const displayName = (req.body.name || req.file.originalname).trim();
     const s3Prefix = kind === "video" ? "photo" : kind;
@@ -470,6 +497,7 @@ app.post(`${apiPrefix}/assets/upload`, upload.single("file"), async (req, res) =
 
     const asset = await prisma.asset.create({
       data: {
+        ownerEmail: ownerEmail || null,
         kind,
         name: displayName,
         originalFileName: req.file.originalname,
@@ -491,6 +519,9 @@ app.get(`${apiPrefix}/assets`, async (req, res) => {
 
   // Audio library should mirror S3 /audio/ folder content directly.
   if (String(kind) === "audio") {
+    const ownerEmail = requireUserEmail(req, res);
+    if (!ownerEmail) return;
+
     try {
       const list = await s3.send(
         new ListObjectsV2Command({
@@ -503,7 +534,9 @@ app.get(`${apiPrefix}/assets`, async (req, res) => {
       const keys = objects.map((obj) => obj.Key);
 
       const existingAssets = keys.length
-        ? await prisma.asset.findMany({ where: { s3Key: { in: keys } } })
+        ? await prisma.asset.findMany({
+            where: { ownerEmail, kind: "audio", s3Key: { in: keys } },
+          })
         : [];
       const assetsByKey = new Map(existingAssets.map((asset) => [asset.s3Key, asset]));
 
@@ -514,7 +547,12 @@ app.get(`${apiPrefix}/assets`, async (req, res) => {
 
         const fileName = deriveFileNameFromKey(key);
         const createdAsset = await prisma.asset.upsert({
-          where: { s3Key: key },
+          where: {
+            ownerEmail_s3Key: {
+              ownerEmail,
+              s3Key: key,
+            },
+          },
           update: {
             // Keep user-assigned name if it already exists; only refresh mutable metadata.
             mimeType: inferAudioMimeType(key),
@@ -522,6 +560,7 @@ app.get(`${apiPrefix}/assets`, async (req, res) => {
             originalFileName: fileName,
           },
           data: {
+            ownerEmail,
             kind: "audio",
             name: displayNameFromFileName(fileName),
             originalFileName: fileName,
@@ -577,9 +616,12 @@ app.get(`${apiPrefix}/assets`, async (req, res) => {
 
 app.get(`${apiPrefix}/assets/:id/content`, async (req, res) => {
   const { id } = req.params;
-  const asset = await findAssetByIdOrKey(id);
+  const asset = await findAssetByIdOrKey(id, getRequestUserEmail(req));
   if (!asset) {
     return res.status(404).json({ error: "Asset not found" });
+  }
+  if (!ensureAudioAssetOwnership(req, res, asset)) {
+    return;
   }
 
   const rangeHeader = req.headers.range;
@@ -643,9 +685,12 @@ app.patch(`${apiPrefix}/assets/:id`, async (req, res) => {
     return res.status(400).json({ error: "name is required" });
   }
 
-  const asset = await findAssetByIdOrKey(id);
+  const asset = await findAssetByIdOrKey(id, getRequestUserEmail(req));
   if (!asset) {
     return res.status(404).json({ error: "Asset not found" });
+  }
+  if (!ensureAudioAssetOwnership(req, res, asset)) {
+    return;
   }
 
   const updated = await prisma.asset.update({
@@ -658,10 +703,13 @@ app.patch(`${apiPrefix}/assets/:id`, async (req, res) => {
 
 app.delete(`${apiPrefix}/assets/:id`, async (req, res) => {
   const { id } = req.params;
-  const asset = await findAssetByIdOrKey(id);
+  const asset = await findAssetByIdOrKey(id, getRequestUserEmail(req));
 
   if (!asset) {
     return res.status(404).json({ error: "Asset not found" });
+  }
+  if (!ensureAudioAssetOwnership(req, res, asset)) {
+    return;
   }
 
   try {
