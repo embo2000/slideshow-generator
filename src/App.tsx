@@ -905,19 +905,50 @@ const normalizeLoadedClassData = (loaded: any) => {
 
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white rounded-xl shadow-sm border p-8 text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-teal-100 text-teal-700 mb-4">
-            <Lock className="h-6 w-6" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">Sign in required</h1>
-          <p className="text-sm text-gray-600 mt-2 mb-6">
-            Please sign in with Google to access your slideshow workspace.
-          </p>
-          <div className="flex justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <header className="bg-white border-b shadow-sm">
+          <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Slideshow Generator</h1>
+              <p className="text-sm text-gray-600">Create beautiful photo slideshows step by step</p>
+            </div>
             <GoogleAuthButton onAuthChange={setCurrentUser} />
           </div>
-        </div>
+        </header>
+
+        <main className="max-w-4xl mx-auto px-4 py-12">
+          <div className="bg-white rounded-xl border shadow-sm p-8">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-teal-100 text-teal-700 mb-4">
+              <Lock className="h-6 w-6" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900">What this app does</h2>
+            <p className="text-gray-700 mt-3 leading-7">
+              Slideshow Generator helps schools and teams quickly create photo slideshows.
+              Upload photos into groups (such as class sessions), choose transitions,
+              background music, and branding options, then generate and save a final slideshow video.
+            </p>
+            <p className="text-gray-700 mt-4 leading-7">
+              You can store slideshow data in a database, keep uploaded media in secure S3 storage,
+              and share tokenized upload links so others can send photos to a specific slideshow and group.
+            </p>
+
+            <div className="mt-8 flex flex-wrap items-center gap-4">
+              <GoogleAuthButton onAuthChange={setCurrentUser} />
+              <a
+                href="/privacy"
+                className="text-sm font-medium text-teal-700 hover:text-teal-800 underline"
+              >
+                Privacy Policy
+              </a>
+              <a
+                href="/terms"
+                className="text-sm font-medium text-teal-700 hover:text-teal-800 underline"
+              >
+                Terms and Conditions
+              </a>
+            </div>
+          </div>
+        </main>
       </div>
     );
   }
