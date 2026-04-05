@@ -1,6 +1,10 @@
 # Slideshow Generator
 
-A beautiful, step-by-step slideshow generator with Google Drive integration for saving and loading your projects.
+A step-by-step slideshow generator with a production-ready backend for:
+
+- PostgreSQL slideshow persistence
+- S3-compatible file storage for photos/music/backgrounds
+- Coolify deployment via Docker
 
 ## Features
 
@@ -9,28 +13,32 @@ A beautiful, step-by-step slideshow generator with Google Drive integration for 
 - **Transition effects** (fade, slide, zoom, flip, dissolve)
 - **Background music** selection
 - **Custom background images**
-- **Google Drive integration** for saving/loading slideshows
+- **Backend persistence** for saving/loading slideshows
+- **S3 asset storage** for uploaded media
 - **High-quality video export** (1080p)
 
-## Google Drive Setup
+## Architecture
 
-To enable Google Drive integration for saving and loading slideshows:
+- `React + Vite` frontend
+- `Express` API server (`/api`)
+- `Prisma + PostgreSQL` for slideshow/settings metadata
+- `S3-compatible bucket` for uploaded files
 
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select an existing one
-3. Enable the Google Drive API and Google+ API
-4. Create credentials (OAuth 2.0 Client ID)
-5. Add your domain to authorized origins
-6. Copy the Client ID and API Key to your `.env` file
+## Environment Variables
 
-### Environment Variables
+Copy `.env.example` to `.env` and set values for your environment.
 
-Create a `.env` file in the root directory:
+Required:
+- `DATABASE_URL`
+- `S3_BUCKET`
+- `S3_REGION`
+- `S3_ACCESS_KEY_ID`
+- `S3_SECRET_ACCESS_KEY`
 
-```env
-VITE_GOOGLE_CLIENT_ID=your_google_client_id_here
-VITE_GOOGLE_API_KEY=your_google_api_key_here
-```
+Optional:
+- `S3_ENDPOINT` (for MinIO/R2/Spaces/etc.)
+- `S3_FORCE_PATH_STYLE=true` for many S3-compatible providers
+- `S3_PUBLIC_URL_BASE` for public object URLs instead of signed URLs
 
 ## Getting Started
 
@@ -39,31 +47,47 @@ VITE_GOOGLE_API_KEY=your_google_api_key_here
    npm install
    ```
 
-2. Set up your Google API credentials (see above)
+2. Configure environment variables in `.env`
 
-3. Start the development server:
+3. Generate Prisma client:
+   ```bash
+   npm run db:generate
+   ```
+
+4. Run database schema (choose one):
+   ```bash
+   npm run db:push
+   ```
+   or for migration-based deploys:
+   ```bash
+   npm run db:migrate
+   ```
+
+5. Start app (frontend + backend):
    ```bash
    npm run dev
    ```
 
-4. Open your browser and start creating slideshows!
+6. Open your browser and start creating slideshows.
 
-## Usage
+## Production / Coolify
 
-1. **Sign in** with your Google account (optional, but required for saving)
-2. **Upload photos** for each image group
-3. **Choose transition effects** between photos
-4. **Select background music** (optional)
-5. **Add a custom background image** (optional)
-6. **Preview and generate** your slideshow video
-7. **Save your project** to Google Drive for later use
+This repo includes a `Dockerfile` ready for Coolify:
+
+1. Create a PostgreSQL service in Coolify and set `DATABASE_URL`.
+2. Set S3 environment variables in Coolify app settings.
+3. Deploy from this repo with Docker build.
+4. Container startup runs:
+   - `prisma migrate deploy`
+   - `node server/index.mjs`
 
 ## Technologies Used
 
 - React + TypeScript
 - Tailwind CSS
-- Google Drive API
-- Google OAuth 2.0
+- Express
+- Prisma + PostgreSQL
+- AWS SDK (S3-compatible storage)
 - Canvas API for video generation
 - Vite for development and building
 

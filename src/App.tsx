@@ -9,10 +9,8 @@ import MusicStep from './components/MusicStep';
 import PreviewStep from './components/PreviewStep';
 import VideoGenerator from './components/VideoGenerator';
 import SettingsModal from './components/SettingsModal';
-import GoogleAuthButton from './components/GoogleAuthButton';
 import SlideshowManager from './components/SlideshowManager';
-import { googleAuthService, GoogleUser } from './services/googleAuth';
-import { googleDriveService } from './services/googleDrive';
+import { backendService } from './services/api';
 import { ClassData, MusicTrack, BackgroundOption, TransitionType } from './types';
 
 const TRANSITION_TYPES: TransitionType[] = [
@@ -43,7 +41,6 @@ function App() {
   const [weeklyMusic, setWeeklyMusic] = useState<MusicTrack | null>(null);
   const [backgroundOption, setBackgroundOption] = useState<BackgroundOption>({ type: 'none' });
   const [selectedTransition, setSelectedTransition] = useState<TransitionType>(TRANSITION_TYPES[0]);
-  const [currentUser, setCurrentUser] = useState<GoogleUser | null>(null);
   const [showSlideshowManager, setShowSlideshowManager] = useState(false);
   const [slideDuration, setSlideDuration] = useState(3); // Default 3 seconds per slide
   const [slideshowName, setSlideshowName] = useState(() => {
@@ -87,37 +84,33 @@ function App() {
   }>>([]);
   const [customMusicTracks, setCustomMusicTracks] = useState<MusicTrack[]>([]);
 
-  // Load groups settings when user signs in
+  // Load app settings and asset libraries
   useEffect(() => {
-    const loadUserGroupsSettings = async () => {
-      if (currentUser && googleAuthService.isSignedIn()) {
-        try {
-          const savedClasses = await googleDriveService.loadGroupsSettings();
-          if (savedClasses && savedClasses.length > 0) {
-            setClasses(savedClasses);
-            // Initialize classData for new groups
-            const newClassData: ClassData = {};
-            savedClasses.forEach(className => {
-              newClassData[className] = classData[className] || [];
-            });
-            setClassData(newClassData);
-          }
-          
-          // Load existing music files
-          const musicFiles = await googleDriveService.listMusicFiles();
-          setExistingMusicFiles(musicFiles);
-          
-          // Load existing background images
-          const backgroundImages = await googleDriveService.listBackgroundImages();
-          setExistingBackgroundImages(backgroundImages);
-        } catch (error) {
-          console.error('Failed to load groups settings:', error);
+    const loadAppData = async () => {
+      try {
+        const savedClasses = await backendService.loadGroupsSettings();
+        if (savedClasses && savedClasses.length > 0) {
+          setClasses(savedClasses);
+          const newClassData: ClassData = {};
+          savedClasses.forEach(className => {
+            newClassData[className] = classData[className] || [];
+          });
+          setClassData(newClassData);
         }
+
+        const [musicFiles, backgroundImages] = await Promise.all([
+          backendService.listMusicFiles(),
+          backendService.listBackgroundImages(),
+        ]);
+        setExistingMusicFiles(musicFiles);
+        setExistingBackgroundImages(backgroundImages);
+      } catch (error) {
+        console.error('Failed to load app data:', error);
       }
     };
 
-    loadUserGroupsSettings();
-  }, [currentUser]);
+    loadAppData();
+  }, []);
 
   // Initialize weekly music selection
   useEffect(() => {
@@ -285,10 +278,16 @@ const handleLoadSlideshow = (data: {
                 
                 // If it's a base64 string, convert it
                 if (typeof img === 'string') {
-                  const base64Data = img.startsWith('data:') ? img : `data:image/jpeg;base64,${img}`;
-                  const response = await fetch(base64Data);
+                  const imageSource = img.startsWith('data:') || img.startsWith('http')
+                    ? img
+                    : `data:image/jpeg;base64,${img}`;
+                  const response = await fetch(imageSource);
                   const blob = await response.blob();
-                  return new File([blob], `${className}-image-${index + 1}.jpg`, { type: 'image/jpeg' });
+                  return new File(
+                    [blob],
+                    `${className}-image-${index + 1}.${blob.type.split('/')[1] || 'jpg'}`,
+                    { type: blob.type || 'image/jpeg' }
+                  );
                 }
                 
                 // If it's an object with data property
@@ -297,6 +296,17 @@ const handleLoadSlideshow = (data: {
                   const response = await fetch(base64Data);
                   const blob = await response.blob();
                   return new File([blob], `${className}-image-${index + 1}.jpg`, { type: 'image/jpeg' });
+                }
+
+                // If it's an object with URL from backend storage
+                if (img && typeof img === 'object' && img.url) {
+                  const response = await fetch(img.url);
+                  const blob = await response.blob();
+                  return new File(
+                    [blob],
+                    img.name || `${className}-image-${index + 1}.${blob.type.split('/')[1] || 'jpg'}`,
+                    { type: blob.type || 'image/jpeg' }
+                  );
                 }
                 
                 console.warn('Unknown image format:', img);
@@ -498,14 +508,10 @@ const normalizeLoadedClassData = (loaded: any) => {
     setClasses(newClasses);
     setClassData(newClassData);
 
-    // Save groups settings to Google Drive if user is signed in
-    if (currentUser && googleAuthService.isSignedIn()) {
-      try {
-        await googleDriveService.saveGroupsSettings(newClasses);
-      } catch (error) {
-        console.error('Failed to save groups settings:', error);
-        // Don't show error to user as this is a background operation
-      }
+    try {
+      await backendService.saveGroupsSettings(newClasses);
+    } catch (error) {
+      console.error('Failed to save groups settings:', error);
     }
   };
 
@@ -526,21 +532,21 @@ const normalizeLoadedClassData = (loaded: any) => {
   };
 
   const handleAutoSave = async () => {
-    if (!currentUser || !googleAuthService.isSignedIn() || !slideshowName.trim() || getTotalPhotos() === 0) {
+    if (!slideshowName.trim() || getTotalPhotos() === 0) {
       return;
     }
 
     try {
-      await googleDriveService.saveSlideshow(
-        slideshowName, 
+      await backendService.saveSlideshow({
+        name: slideshowName,
         classData,
         selectedMusic,
         backgroundOption,
         selectedTransition,
         classes,
         slideDuration,
-        slideshowName
-      );
+        slideshowName,
+      });
       console.log('Auto-save successful for:', slideshowName);
     } catch (error) {
       console.error('Auto-save failed:', error);
@@ -704,11 +710,18 @@ const normalizeLoadedClassData = (loaded: any) => {
                 </svg>
                 New Slideshow
               </button>
-              <GoogleAuthButton 
-                onAuthChange={setCurrentUser}
-                onShowSettings={() => setShowSettings(true)}
-                onShowSlideshowManager={() => setShowSlideshowManager(true)}
-              />
+              <button
+                onClick={() => setShowSettings(true)}
+                className="inline-flex items-center px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors duration-200 shadow-sm"
+              >
+                Manage Groups
+              </button>
+              <button
+                onClick={() => setShowSlideshowManager(true)}
+                className="inline-flex items-center px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium transition-colors duration-200 shadow-sm"
+              >
+                My Slideshows
+              </button>
             </div>
           </div>
         </div>

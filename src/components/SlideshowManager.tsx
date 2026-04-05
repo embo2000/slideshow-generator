@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, FolderOpen, Trash2, Download, Calendar, Clock } from 'lucide-react';
-import { googleDriveService, DriveFile } from '../services/googleDrive';
-import { googleAuthService } from '../services/googleAuth';
+import { X, Save, FolderOpen, Trash2, Calendar, Clock } from 'lucide-react';
+import { backendService, StoredSlideshow } from '../services/api';
 import { ClassData, MusicTrack, BackgroundOption, TransitionType } from '../types';
 
 interface SlideshowManagerProps {
@@ -31,21 +30,19 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
   onLoadSlideshow,
   onClose
 }) => {
-  const [savedSlideshows, setSavedSlideshows] = useState<DriveFile[]>([]);
+  const [savedSlideshows, setSavedSlideshows] = useState<StoredSlideshow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [slideshowName, setSlideshowName] = useState('');
   const [activeTab, setActiveTab] = useState<'save' | 'load'>('save');
 
   useEffect(() => {
-    if (googleAuthService.isSignedIn()) {
-      loadSlideshows();
-    }
+    loadSlideshows();
   }, []);
 
   useEffect(() => {
     // Reload slideshows when switching to load tab
-    if (activeTab === 'load' && googleAuthService.isSignedIn()) {
+    if (activeTab === 'load') {
       loadSlideshows();
     }
   }, [activeTab]);
@@ -53,7 +50,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
   const loadSlideshows = async () => {
     setIsLoading(true);
     try {
-      const slideshows = await googleDriveService.listSlideshows();
+      const slideshows = await backendService.listSlideshows();
       setSavedSlideshows(slideshows);
     } catch (error) {
       console.error('Failed to load slideshows:', error);
@@ -71,16 +68,16 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
 
     setIsSaving(true);
     try {
-      await googleDriveService.saveSlideshow(
-        slideshowName,
-        currentSlideshow.classData,
-        currentSlideshow.selectedMusic,
-        currentSlideshow.backgroundOption,
-        currentSlideshow.selectedTransition,
-        currentSlideshow.classes,
-        currentSlideshow.slideDuration,
-        currentSlideshow.slideshowName
-      );
+      await backendService.saveSlideshow({
+        name: slideshowName,
+        classData: currentSlideshow.classData,
+        selectedMusic: currentSlideshow.selectedMusic,
+        backgroundOption: currentSlideshow.backgroundOption,
+        selectedTransition: currentSlideshow.selectedTransition,
+        classes: currentSlideshow.classes,
+        slideDuration: currentSlideshow.slideDuration,
+        slideshowName: currentSlideshow.slideshowName
+      });
       
       alert('Slideshow saved successfully!');
       setSlideshowName('');
@@ -100,7 +97,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
   const handleLoad = async (fileId: string) => {
     setIsLoading(true);
     try {
-      const slideshowData = await googleDriveService.loadSlideshow(fileId);
+      const slideshowData = await backendService.loadSlideshow(fileId);
       onLoadSlideshow(slideshowData);
       onClose();
     } catch (error) {
@@ -117,7 +114,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
     }
 
     try {
-      await googleDriveService.deleteSlideshow(fileId);
+      await backendService.deleteSlideshow(fileId);
       await loadSlideshows();
     } catch (error) {
       console.error('Failed to delete slideshow:', error);
@@ -139,35 +136,13 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
     return Object.values(currentSlideshow.classData).reduce((total, photos) => total + photos.length, 0);
   };
 
-  if (!googleAuthService.isSignedIn()) {
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
-          <div className="text-center">
-            <FolderOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Sign In Required</h2>
-            <p className="text-gray-600 mb-4">
-              Please sign in with your Google account to save and load slideshows.
-            </p>
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col">
         <div className="flex items-center justify-between p-6 border-b">
           <div>
             <h2 className="text-xl font-bold text-gray-900">Slideshow Manager</h2>
-            <p className="text-sm text-gray-500 mt-1">Save and load your slideshows to Google Drive</p>
+            <p className="text-sm text-gray-500 mt-1">Save and load your slideshows from your backend</p>
           </div>
           <button
             onClick={onClose}
@@ -255,7 +230,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
                 ) : (
                   <Save className="h-5 w-5 mr-2" />
                 )}
-                {isSaving ? 'Saving...' : 'Save to Google Drive'}
+                {isSaving ? 'Saving...' : 'Save Slideshow'}
               </button>
             </div>
           )}
@@ -313,62 +288,6 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
             </div>
           )}
 
-          {activeTab === 'assets' && (
-            <div className="space-y-4">
-              {isLoading ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                  <p className="text-gray-500">Loading saved assets...</p>
-                </div>
-              ) : savedAssets.length === 0 ? (
-                <div className="text-center py-8">
-                  <Download className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">No saved assets found</p>
-                  <p className="text-sm text-gray-400 mt-1">Background images and audio files will appear here when saved</p>
-                </div>
-              ) : (
-                <div className="grid gap-4">
-                  {savedAssets.map((asset) => (
-                    <div key={asset.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div className="p-2 rounded-lg bg-gray-100">
-                            {asset.mimeType?.startsWith('image/') ? (
-                              <Image className="h-5 w-5 text-blue-600" />
-                            ) : asset.mimeType?.startsWith('audio/') ? (
-                              <Music className="h-5 w-5 text-green-600" />
-                            ) : (
-                              <Download className="h-5 w-5 text-gray-600" />
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="font-medium text-gray-900">{asset.name}</h3>
-                            <div className="flex items-center space-x-4 mt-1 text-sm text-gray-500">
-                              <div className="flex items-center">
-                                <Calendar className="h-3 w-3 mr-1" />
-                                Created: {formatDate(asset.createdTime)}
-                              </div>
-                              {asset.size && (
-                                <div>
-                                  Size: {Math.round(parseInt(asset.size) / 1024)} KB
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <span className="text-xs px-2 py-1 bg-gray-100 rounded text-gray-600">
-                            {asset.mimeType?.startsWith('image/') ? 'Image' : 
-                             asset.mimeType?.startsWith('audio/') ? 'Audio' : 'File'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
     </div>

@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AssetKind {
+  image
+  audio
+  photo
+}
+
+model Slideshow {
+  id                 String   @id @default(cuid())
+  name               String   @unique
+  slideshowName      String
+  classes            Json
+  classData          Json
+  selectedMusic      Json?
+  backgroundOption   Json?
+  selectedTransition Json
+  slideDuration      Int      @default(3)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([updatedAt(sort: Desc)])
+}
+
+model Asset {
+  id               String    @id @default(cuid())
+  kind             AssetKind
+  name             String
+  originalFileName String
+  mimeType         String
+  size             Int
+  s3Key            String    @unique
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([kind, createdAt(sort: Desc)])
+}
+
+model AppSetting {
+  key       String   @id
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
