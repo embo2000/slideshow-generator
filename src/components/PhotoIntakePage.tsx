@@ -1,12 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Upload, ImagePlus } from "lucide-react";
 import { backendService, IntakeBootstrap } from "../services/api";
+import { clearSharedPayload, readSharedPayload } from "../utils/shareTargetPayload";
 
 interface PhotoIntakePageProps {
   token: string;
 }
 
 const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
+  const searchParams = useMemo(() => new URLSearchParams(window.location.search), []);
+  const sharedPayloadId = searchParams.get("sharedPayload");
   const [bootstrap, setBootstrap] = useState<IntakeBootstrap | null>(null);
   const [mode, setMode] = useState<"existing" | "new">("existing");
   const [existingSlideshowId, setExistingSlideshowId] = useState("");
@@ -17,6 +20,35 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [pwaInstalled, setPwaInstalled] = useState(false);
+  const [shareTargetReady, setShareTargetReady] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem("default-intake-token", token);
+  }, [token]);
+
+  useEffect(() => {
+    const evaluatePwaStatus = () => {
+      const standaloneMedia = window.matchMedia("(display-mode: standalone)").matches;
+      const legacyStandalone = (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+      const installed = standaloneMedia || legacyStandalone;
+      const canUseShareTargetInfra =
+        "serviceWorker" in navigator && "caches" in window && !!navigator.serviceWorker.controller;
+
+      setPwaInstalled(installed);
+      setShareTargetReady(installed && canUseShareTargetInfra);
+    };
+
+    evaluatePwaStatus();
+    const interval = window.setInterval(evaluatePwaStatus, 1500);
+    const onVisibility = () => evaluatePwaStatus();
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
 
   useEffect(() => {
     const run = async () => {
@@ -42,6 +74,27 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
     };
     run();
   }, [token]);
+
+  useEffect(() => {
+    if (!sharedPayloadId) return;
+
+    const importSharedFiles = async () => {
+      const sharedFiles = await readSharedPayload(sharedPayloadId);
+      if (sharedFiles.length === 0) {
+        return;
+      }
+
+      setFiles(sharedFiles);
+      setSuccess(
+        `Loaded ${sharedFiles.length} shared photo${sharedFiles.length === 1 ? "" : "s"} from Android Share.`
+      );
+      await clearSharedPayload(sharedPayloadId);
+    };
+
+    importSharedFiles().catch((error) => {
+      console.error("Failed to import shared photos:", error);
+    });
+  }, [sharedPayloadId]);
 
   const selectedExisting = useMemo(
     () => bootstrap?.slideshows.find((s) => s.id === existingSlideshowId) || null,
@@ -162,6 +215,22 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
           <p className="text-gray-600 text-sm mt-1">
             Pick a slideshow and group, then upload images.
           </p>
+        </div>
+
+        <div
+          className={`text-sm rounded-lg border p-3 ${
+            shareTargetReady
+              ? "bg-green-50 border-green-200 text-green-700"
+              : pwaInstalled
+              ? "bg-amber-50 border-amber-200 text-amber-700"
+              : "bg-slate-50 border-slate-200 text-slate-700"
+          }`}
+        >
+          {shareTargetReady
+            ? "PWA installed and Share Target ready. Android Send To can upload photos here."
+            : pwaInstalled
+            ? "PWA installed. Finalizing Share Target support — if needed, reopen the app once."
+            : "For Android Send To: install this app from Chrome menu -> Install app."}
         </div>
 
         <div className="space-y-3">

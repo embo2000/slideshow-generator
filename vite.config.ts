@@ -1,9 +1,58 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
+      manifest: {
+        name: 'Slideshow Generator',
+        short_name: 'Slideshows',
+        description: 'Create and upload slideshow photos from any device.',
+        theme_color: '#0f766e',
+        background_color: '#f8fafc',
+        display: 'standalone',
+        start_url: '/',
+        scope: '/',
+        icons: [
+          {
+            src: '/icon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'any maskable',
+          },
+        ],
+        share_target: {
+          action: '/share-target',
+          method: 'POST',
+          enctype: 'multipart/form-data',
+          params: {
+            title: 'title',
+            text: 'text',
+            url: 'url',
+            files: [
+              {
+                name: 'files',
+                accept: ['image/*'],
+              },
+            ],
+          },
+        },
+      },
+      injectManifest: {
+        rollupFormat: 'es',
+      },
+      devOptions: {
+        enabled: true,
+      },
+    }),
+  ],
   optimizeDeps: {
     exclude: ['lucide-react'],
   },

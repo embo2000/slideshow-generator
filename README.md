@@ -16,6 +16,8 @@ A step-by-step slideshow generator with a production-ready backend for:
 - **Backend persistence** for saving/loading slideshows
 - **S3 asset storage** for uploaded media
 - **Optional Google login UI** for account sign-in
+- **PWA install support** (Android home-screen app)
+- **Android Share Target** for sending photos directly into intake uploads
 - **High-quality video export** (1080p)
 
 ## Architecture
@@ -82,6 +84,17 @@ This repo includes a `Dockerfile` ready for Coolify:
 4. Container startup runs:
    - `prisma migrate deploy`
    - `node server/index.mjs`
+
+## Android "Send To" Flow (PWA)
+
+1. Open an upload link once (for example `/intake/<token>`) in Chrome on Android.
+2. Use Chrome menu -> **Install app** to install Slideshow Generator.
+3. Share photos from Gallery/Messages -> choose **Slideshow Generator**.
+4. The app will route shared files into the last upload link you opened.
+
+Notes:
+- The first time, if no upload link is saved yet, the app asks for an upload link/token.
+- Share Target currently accepts image files (`image/*`).
 
 ## Technologies Used
 
