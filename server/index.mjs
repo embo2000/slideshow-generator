@@ -57,8 +57,27 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 const normalizeName = (name) => name.replace(/[^\w.\-]+/g, "_");
+const normalizeEmail = (value) =>
+  typeof value === "string" && value.trim() ? value.trim().toLowerCase() : null;
 const deriveFileNameFromKey = (key = "") => key.split("/").pop() || key;
 const hashToken = (token) => crypto.createHash("sha256").update(token).digest("hex");
+const groupsSettingKey = (ownerEmail) => (ownerEmail ? `groups:${ownerEmail}` : "groups");
+
+const getRequestUserEmail = (req) => normalizeEmail(req.headers["x-user-email"]);
+
+const requireUserEmail = (req, res) => {
+  const ownerEmail = getRequestUserEmail(req);
+  if (!ownerEmail) {
+    res.status(401).json({ error: "Authentication required" });
+    return null;
+  }
+  return ownerEmail;
+};
+
+const readOwnerEmailFromMetadata = (metadata) => {
+  if (!metadata || typeof metadata !== "object") return null;
+  return normalizeEmail(metadata.ownerEmail);
+};
 
 const buildAssetUrl = async (s3Key) => {
   const publicBase = process.env.S3_PUBLIC_URL_BASE;
@@ -125,6 +144,7 @@ const getValidUploadLink = async (token) => {
   if (!uploadLink) return null;
   if (!uploadLink.active) return null;
   if (uploadLink.expiresAt <= new Date()) return null;
+  if (!readOwnerEmailFromMetadata(uploadLink.metadata)) return null;
   return uploadLink;
 };
 
@@ -155,9 +175,12 @@ app.get(`${apiPrefix}/health`, async (_req, res) => {
   }
 });
 
-app.get(`${apiPrefix}/settings/groups`, async (_req, res) => {
+app.get(`${apiPrefix}/settings/groups`, async (req, res) => {
+  const ownerEmail = requireUserEmail(req, res);
+  if (!ownerEmail) return;
+
   const groups = await prisma.appSetting.findUnique({
-    where: { key: "groups" },
+    where: { key: groupsSettingKey(ownerEmail) },
   });
 
   res.json({
@@ -166,21 +189,27 @@ app.get(`${apiPrefix}/settings/groups`, async (_req, res) => {
 });
 
 app.put(`${apiPrefix}/settings/groups`, async (req, res) => {
+  const ownerEmail = requireUserEmail(req, res);
+  if (!ownerEmail) return;
+
   const { classes } = req.body ?? {};
   if (!Array.isArray(classes)) {
     return res.status(400).json({ error: "classes must be an array of strings" });
   }
 
   await prisma.appSetting.upsert({
-    where: { key: "groups" },
+    where: { key: groupsSettingKey(ownerEmail) },
     update: { value: { classes } },
-    create: { key: "groups", value: { classes } },
+    create: { key: groupsSettingKey(ownerEmail), value: { classes } },
   });
 
   res.json({ success: true });
 });
 
 app.post(`${apiPrefix}/intake-links`, async (req, res) => {
+  const ownerEmail = requireUserEmail(req, res);
+  if (!ownerEmail) return;
+
   const expiresInDays = Number(req.body?.expiresInDays ?? 7);
   const safeDays = Number.isFinite(expiresInDays)
     ? Math.max(1, Math.min(30, expiresInDays))
@@ -190,12 +219,17 @@ app.post(`${apiPrefix}/intake-links`, async (req, res) => {
   const tokenHash = hashToken(token);
   const expiresAt = new Date(Date.now() + safeDays * 24 * 60 * 60 * 1000);
 
+  const metadata =
+    req.body?.metadata && typeof req.body.metadata === "object"
+      ? { ...req.body.metadata, ownerEmail }
+      : { ownerEmail };
+
   const link = await prisma.uploadLink.create({
     data: {
       tokenHash,
       expiresAt,
       active: true,
-      metadata: req.body?.metadata ?? null,
+      metadata,
     },
   });
 
@@ -213,12 +247,17 @@ app.get(`${apiPrefix}/intake/:token/bootstrap`, async (req, res) => {
     return res.status(401).json({ error: "Invalid or expired intake token" });
   }
 
+  const intakeOwnerEmail = readOwnerEmailFromMetadata(uploadLink.metadata);
+  if (!intakeOwnerEmail) {
+    return res.status(401).json({ error: "Invalid or expired intake token" });
+  }
   const groups = await prisma.appSetting.findUnique({
-    where: { key: "groups" },
+    where: { key: groupsSettingKey(intakeOwnerEmail) },
   });
   const defaultClasses = Array.isArray(groups?.value?.classes) ? groups.value.classes : [];
 
   const slideshows = await prisma.slideshow.findMany({
+    where: { ownerEmail: intakeOwnerEmail },
     orderBy: { updatedAt: "desc" },
     select: {
       id: true,
@@ -257,8 +296,12 @@ app.post(`${apiPrefix}/intake/:token/slideshows`, async (req, res) => {
   const requestedClasses = Array.isArray(req.body?.classes)
     ? req.body.classes.filter((c) => typeof c === "string" && c.trim())
     : null;
+  const ownerEmail = readOwnerEmailFromMetadata(uploadLink.metadata);
+  if (!ownerEmail) {
+    return res.status(401).json({ error: "Invalid or expired intake token" });
+  }
   const groups = await prisma.appSetting.findUnique({
-    where: { key: "groups" },
+    where: { key: groupsSettingKey(ownerEmail) },
   });
   const defaultClasses = Array.isArray(groups?.value?.classes) ? groups.value.classes : [];
   const classes = requestedClasses && requestedClasses.length > 0 ? requestedClasses : defaultClasses;
@@ -266,7 +309,11 @@ app.post(`${apiPrefix}/intake/:token/slideshows`, async (req, res) => {
   const uniqueName = async (base) => {
     let candidate = base;
     let idx = 2;
-    while (await prisma.slideshow.findUnique({ where: { name: candidate } })) {
+    while (
+      await prisma.slideshow.findFirst({
+        where: { ownerEmail, name: candidate },
+      })
+    ) {
       candidate = `${base} (${idx})`;
       idx += 1;
     }
@@ -278,6 +325,7 @@ app.post(`${apiPrefix}/intake/:token/slideshows`, async (req, res) => {
 
   const created = await prisma.slideshow.create({
     data: {
+      ownerEmail,
       name,
       slideshowName: name,
       classes: classes || [],
@@ -319,8 +367,15 @@ app.post(`${apiPrefix}/intake/:token/upload`, intakeUpload.array("files", 20), a
     return res.status(400).json({ error: "At least one file is required" });
   }
 
+  const tokenOwnerEmail = readOwnerEmailFromMetadata(uploadLink.metadata);
+  if (!tokenOwnerEmail) {
+    return res.status(401).json({ error: "Invalid or expired intake token" });
+  }
   const slideshow = await prisma.slideshow.findUnique({ where: { id: slideshowId } });
   if (!slideshow) {
+    return res.status(404).json({ error: "Slideshow not found" });
+  }
+  if (tokenOwnerEmail && slideshow.ownerEmail !== tokenOwnerEmail) {
     return res.status(404).json({ error: "Slideshow not found" });
   }
 
@@ -399,7 +454,8 @@ app.post(`${apiPrefix}/assets/upload`, upload.single("file"), async (req, res) =
     }
 
     const displayName = (req.body.name || req.file.originalname).trim();
-    const objectKey = `${kind}/${Date.now()}-${crypto.randomUUID()}-${normalizeName(
+    const s3Prefix = kind === "video" ? "photo" : kind;
+    const objectKey = `${s3Prefix}/${Date.now()}-${crypto.randomUUID()}-${normalizeName(
       req.file.originalname
     )}`;
 
@@ -623,8 +679,12 @@ app.delete(`${apiPrefix}/assets/:id`, async (req, res) => {
   res.status(204).send();
 });
 
-app.get(`${apiPrefix}/slideshows`, async (_req, res) => {
+app.get(`${apiPrefix}/slideshows`, async (req, res) => {
+  const ownerEmail = requireUserEmail(req, res);
+  if (!ownerEmail) return;
+
   const slideshows = await prisma.slideshow.findMany({
+    where: { ownerEmail },
     orderBy: { updatedAt: "desc" },
     select: {
       id: true,
@@ -645,11 +705,14 @@ app.get(`${apiPrefix}/slideshows`, async (_req, res) => {
 });
 
 app.get(`${apiPrefix}/slideshows/:id`, async (req, res) => {
+  const ownerEmail = requireUserEmail(req, res);
+  if (!ownerEmail) return;
+
   const slideshow = await prisma.slideshow.findUnique({
     where: { id: req.params.id },
   });
 
-  if (!slideshow) {
+  if (!slideshow || slideshow.ownerEmail !== ownerEmail) {
     return res.status(404).json({ error: "Slideshow not found" });
   }
 
@@ -724,6 +787,9 @@ app.get(`${apiPrefix}/slideshows/:id`, async (req, res) => {
 });
 
 app.post(`${apiPrefix}/slideshows`, async (req, res) => {
+  const ownerEmail = requireUserEmail(req, res);
+  if (!ownerEmail) return;
+
   const payload = req.body ?? {};
   if (!payload.name || typeof payload.name !== "string") {
     return res.status(400).json({ error: "name is required" });
@@ -740,9 +806,15 @@ app.post(`${apiPrefix}/slideshows`, async (req, res) => {
   };
 
   const saved = await prisma.slideshow.upsert({
-    where: { name: payload.name },
+    where: {
+      ownerEmail_name: {
+        ownerEmail,
+        name: payload.name,
+      },
+    },
     update: baseData,
     create: {
+      ownerEmail,
       name: payload.name,
       ...baseData,
     },
@@ -757,9 +829,18 @@ app.post(`${apiPrefix}/slideshows`, async (req, res) => {
 });
 
 app.delete(`${apiPrefix}/slideshows/:id`, async (req, res) => {
-  await prisma.slideshow.delete({
+  const ownerEmail = requireUserEmail(req, res);
+  if (!ownerEmail) return;
+
+  const slideshow = await prisma.slideshow.findUnique({
     where: { id: req.params.id },
+    select: { id: true, ownerEmail: true },
   });
+  if (!slideshow || slideshow.ownerEmail !== ownerEmail) {
+    return res.status(404).json({ error: "Slideshow not found" });
+  }
+
+  await prisma.slideshow.delete({ where: { id: req.params.id } });
   res.status(204).send();
 });
 

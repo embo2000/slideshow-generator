@@ -41,14 +41,38 @@ export interface SlideshowPayload {
 }
 
 const apiBase = import.meta.env.VITE_API_BASE_URL || "/api";
+let currentUserEmail: string | null = null;
+
+const buildHeaders = (baseHeaders: HeadersInit = {}, includeJsonContentType = true): HeadersInit => {
+  const headers: Record<string, string> = {};
+
+  if (includeJsonContentType) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  if (currentUserEmail) {
+    headers["X-User-Email"] = currentUserEmail;
+  }
+
+  if (baseHeaders instanceof Headers) {
+    baseHeaders.forEach((value, key) => {
+      headers[key] = value;
+    });
+  } else if (Array.isArray(baseHeaders)) {
+    baseHeaders.forEach(([key, value]) => {
+      headers[key] = value;
+    });
+  } else {
+    Object.assign(headers, baseHeaders);
+  }
+
+  return headers;
+};
 
 const apiFetch = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(`${apiBase}${path}`, {
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
+    headers: buildHeaders(init?.headers, true),
   });
 
   if (!response.ok) {
@@ -76,6 +100,7 @@ const uploadAsset = async (
   const response = await fetch(`${apiBase}/assets/upload`, {
     method: "POST",
     body: form,
+    headers: buildHeaders({}, false),
   });
 
   if (!response.ok) {
@@ -179,6 +204,9 @@ const saveSlideshow = async (params: {
 };
 
 export const backendService = {
+  setCurrentUserEmail: (email: string | null) => {
+    currentUserEmail = email?.trim().toLowerCase() || null;
+  },
   saveSlideshow,
   uploadAsset,
   renameAsset: (id: string, name: string) =>
@@ -231,6 +259,7 @@ export const backendService = {
     const response = await fetch(`${apiBase}/intake/${encodeURIComponent(token)}/upload`, {
       method: "POST",
       body: form,
+      headers: buildHeaders({}, false),
     });
     if (!response.ok) {
       throw new Error(await response.text());

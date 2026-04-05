@@ -95,6 +95,10 @@ function App() {
   const uploadingPhotoAssetsRef = useRef<WeakMap<File, Promise<StoredFile>>>(new WeakMap());
   const uploadingMusicTrackIdsRef = useRef<Set<string>>(new Set());
 
+  useEffect(() => {
+    backendService.setCurrentUserEmail(currentUser?.email ?? null);
+  }, [currentUser]);
+
   // Load app settings and asset libraries
   useEffect(() => {
     if (!currentUser) return;
