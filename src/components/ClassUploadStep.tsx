@@ -57,6 +57,11 @@ const ClassUploadStep: React.FC<ClassUploadStepProps> = ({
     setDragOver(false);
   };
 
+  const getPhotoSrc = (photo: File) => {
+    const previewUrl = (photo as File & { previewUrl?: string }).previewUrl;
+    return previewUrl || URL.createObjectURL(photo);
+  };
+
   return (
     <WizardStepWrapper
       title={`Upload Photos for ${className}`}
@@ -70,7 +75,7 @@ const ClassUploadStep: React.FC<ClassUploadStepProps> = ({
               {photos[index] ? (
                 <div className="relative group">
                   <img
-                    src={URL.createObjectURL(photos[index])}
+                    src={getPhotoSrc(photos[index])}
                     alt={`Photo ${index + 1}`}
                     className="w-full h-full object-cover rounded-lg border-2 border-gray-200"
                   />

@@ -97,7 +97,7 @@ const buildAssetUrl = async (s3Key) => {
 
 const mapAssetForClient = async (asset) => {
   const url =
-    asset.kind === "audio"
+    asset.kind === "audio" || asset.kind === "photo" || asset.kind === "image"
       ? `${apiPrefix}/assets/${asset.id}/content`
       : await buildAssetUrl(asset.s3Key);
   return {
@@ -781,7 +781,7 @@ app.get(`${apiPrefix}/slideshows/:id`, async (req, res) => {
         const asset = await prisma.asset.findUnique({ where: { id: image.id } });
         if (!asset) return image;
 
-        const freshUrl = await buildAssetUrl(asset.s3Key);
+        const freshUrl = `${apiPrefix}/assets/${asset.id}/content`;
         return {
           ...image,
           name: image.name || asset.name,
@@ -813,7 +813,7 @@ app.get(`${apiPrefix}/slideshows/:id`, async (req, res) => {
         ...backgroundOption,
         image: {
           ...backgroundOption.image,
-          url: await buildAssetUrl(asset.s3Key),
+          url: `${apiPrefix}/assets/${asset.id}/content`,
         },
       };
     }

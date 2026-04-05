@@ -15,6 +15,7 @@ import type { GoogleUser } from './services/googleAuth';
 import { backendService, StoredFile } from './services/api';
 import { ClassData, MusicTrack, BackgroundOption, TransitionType } from './types';
 import { useDialog } from './components/ui/DialogProvider';
+import { subscribeUploadSync } from './utils/slideshowSync';
 
 const TRANSITION_TYPES: TransitionType[] = [
   { id: 'fade', name: 'Fade', description: 'Smooth fade between images' },
@@ -49,6 +50,8 @@ function App() {
   const [selectedTransition, setSelectedTransition] = useState<TransitionType>(TRANSITION_TYPES[0]);
   const [showSlideshowManager, setShowSlideshowManager] = useState(false);
   const [slideDuration, setSlideDuration] = useState(3); // Default 3 seconds per slide
+  const [loadedSlideshowLabel, setLoadedSlideshowLabel] = useState<string | null>(null);
+  const [currentSlideshowId, setCurrentSlideshowId] = useState<string | null>(null);
   const [slideshowName, setSlideshowName] = useState(() => {
     const today = new Date();
     const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
@@ -179,6 +182,13 @@ const getTotalPhotos = () => {
     total + (photos && Array.isArray(photos) ? photos.length : 0), 0
   );
 };
+
+  const hasSlideshowContent = () => {
+    if (getTotalPhotos() > 0) return true;
+    if (selectedMusic !== null) return true;
+    if (backgroundOption.type !== 'none') return true;
+    return false;
+  };
 
   const getClassesWithPhotos = () => {
     return classes.filter(groupName => (classData[groupName] ?? []).length > 0);
@@ -402,6 +412,8 @@ const getTotalPhotos = () => {
   };
 
 const handleLoadSlideshow = (data: {
+  id?: string;
+  name?: string;
   classData?: ClassData;
   selectedMusic?: MusicTrack | null;
   backgroundOption?: BackgroundOption;
@@ -466,16 +478,14 @@ const handleLoadSlideshow = (data: {
 
                 // If it's an object with URL from backend storage
                 if (img && typeof img === 'object' && img.url) {
-                  const response = await fetch(img.url);
-                  if (!response.ok) {
-                    throw new Error(`Failed to fetch image URL (${response.status})`);
-                  }
-                  const blob = await response.blob();
+                  // Keep a lightweight file placeholder and always render from backend URL.
+                  // This avoids CORS/signature issues from trying to fetch-and-rebuild remote images.
                   const loadedFile = new File(
-                    [blob],
-                    img.name || `${className}-image-${index + 1}.${blob.type.split('/')[1] || 'jpg'}`,
-                    { type: blob.type || 'image/jpeg' }
+                    [new Blob([], { type: 'image/jpeg' })],
+                    img.name || `${className}-image-${index + 1}.jpg`,
+                    { type: 'image/jpeg' }
                   );
+                  (loadedFile as File & { previewUrl?: string }).previewUrl = img.url;
                   if (img.id) {
                     uploadedPhotoAssetsRef.current.set(loadedFile, {
                       id: img.id,
@@ -546,6 +556,8 @@ const handleLoadSlideshow = (data: {
       const day = String(today.getDate()).padStart(2, '0');
       return `${year}-${month}-${day}`;
     })());
+    setCurrentSlideshowId(data.id ?? null);
+    setLoadedSlideshowLabel(data.slideshowName ?? (data as any).name ?? null);
     setClasses(slideshowClasses);
     setCurrentStep(0);
   };
@@ -691,7 +703,7 @@ const normalizeLoadedClassData = (loaded: any) => {
       await backendService.saveGroupsSettings(newClasses);
 
       // Persist group changes immediately on the active slideshow as well.
-      await backendService.saveSlideshow({
+      const saved = await backendService.saveSlideshow({
         name: slideshowName,
         classData: newClassData,
         selectedMusic,
@@ -702,6 +714,8 @@ const normalizeLoadedClassData = (loaded: any) => {
         slideshowName,
         uploadedPhotoAssets: uploadedPhotoAssetsRef.current,
       });
+      setCurrentSlideshowId(saved.id);
+      setLoadedSlideshowLabel(saved.name || slideshowName);
     } catch (error) {
       console.error('Failed to save groups settings/current slideshow:', error);
     }
@@ -735,9 +749,13 @@ const normalizeLoadedClassData = (loaded: any) => {
     if (!slideshowName.trim()) {
       return;
     }
+    // Prevent accidental overwrite of an existing slideshow name with an empty wizard state.
+    if (!hasSlideshowContent()) {
+      return;
+    }
 
     try {
-      await backendService.saveSlideshow({
+      const saved = await backendService.saveSlideshow({
         name: slideshowName,
         classData,
         selectedMusic,
@@ -748,6 +766,8 @@ const normalizeLoadedClassData = (loaded: any) => {
         slideshowName,
         uploadedPhotoAssets: uploadedPhotoAssetsRef.current,
       });
+      setCurrentSlideshowId(saved.id);
+      setLoadedSlideshowLabel(saved.name || slideshowName);
       console.log('Auto-save successful for:', slideshowName);
     } catch (error) {
       console.error('Auto-save failed:', error);
@@ -814,6 +834,8 @@ const normalizeLoadedClassData = (loaded: any) => {
     setSlideDuration(3);
     setCustomMusicTracks([]);
     setCurrentStep(0);
+    setCurrentSlideshowId(null);
+    setLoadedSlideshowLabel(null);
     
     // Generate new default slideshow name
     const today = new Date();
@@ -838,6 +860,30 @@ const normalizeLoadedClassData = (loaded: any) => {
     
     setSlideshowName(`${formatDate(monday)} to ${formatDate(sunday)}`);
   };
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const unsubscribe = subscribeUploadSync(async (event) => {
+      const matchesCurrent =
+        (currentSlideshowId && event.slideshowId === currentSlideshowId) ||
+        (!!event.slideshowName && event.slideshowName === slideshowName);
+
+      if (!matchesCurrent) return;
+
+      try {
+        const previousStep = currentStep;
+        const refreshed = await backendService.loadSlideshow(event.slideshowId);
+        handleLoadSlideshow(refreshed);
+        setCurrentStep(previousStep);
+        toast('New photos synced from Upload Link.', 'info');
+      } catch (error) {
+        console.error('Failed to sync upload-link update:', error);
+      }
+    });
+
+    return unsubscribe;
+  }, [currentUser, currentSlideshowId, slideshowName, currentStep]);
   const renderCurrentStep = () => {
     if (currentStep < classes.length) {
       // Image group upload steps
@@ -982,6 +1028,9 @@ const normalizeLoadedClassData = (loaded: any) => {
               <div>
                 <h1 className="text-xl font-bold text-gray-900">Slideshow Generator</h1>
                 <p className="text-sm text-gray-500">Create beautiful photo slideshows step by step</p>
+                <p className="text-xs text-teal-700 mt-0.5">
+                  Working on: <span className="font-semibold">{loadedSlideshowLabel || slideshowName}</span>
+                </p>
               </div>
             </div>
             

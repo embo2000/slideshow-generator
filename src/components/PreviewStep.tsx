@@ -47,6 +47,11 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
     return Math.round((getTotalPhotos() * slideDuration) / 60 * 10) / 10; // Convert to minutes, round to 1 decimal
   };
 
+  const getPhotoSrc = (photo: File) => {
+    const previewUrl = (photo as File & { previewUrl?: string }).previewUrl;
+    return previewUrl || URL.createObjectURL(photo);
+  };
+
   // Auto-save when slideshow name changes (with debouncing)
   useEffect(() => {
     // Don't auto-save if no slideshow name, no photos, or already saving
@@ -278,7 +283,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
                   {photos.map((photo, index) => (
                     <img
                       key={index}
-                      src={URL.createObjectURL(photo)}
+                      src={getPhotoSrc(photo)}
                       alt={`${groupName} photo ${index + 1}`}
                       className="w-full aspect-square object-cover rounded border"
                     />

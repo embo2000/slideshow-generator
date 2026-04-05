@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Upload, ImagePlus } from "lucide-react";
 import { backendService, IntakeBootstrap } from "../services/api";
 import { clearSharedPayload, readSharedPayload } from "../utils/shareTargetPayload";
+import { emitUploadSync } from "../utils/slideshowSync";
 
 interface PhotoIntakePageProps {
   token: string;
@@ -31,6 +32,7 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
     null
   );
   const [showInstallHelp, setShowInstallHelp] = useState(false);
+  const [activePreviewIndex, setActivePreviewIndex] = useState<number | null>(null);
 
   useEffect(() => {
     localStorage.setItem("default-intake-token", token);
@@ -126,6 +128,21 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
     });
   }, [sharedPayloadId]);
 
+  const previewItems = useMemo(
+    () =>
+      files.map((file) => ({
+        file,
+        url: URL.createObjectURL(file),
+      })),
+    [files]
+  );
+
+  useEffect(() => {
+    return () => {
+      previewItems.forEach((item) => URL.revokeObjectURL(item.url));
+    };
+  }, [previewItems]);
+
   const selectedExisting = useMemo(
     () => bootstrap?.slideshows.find((s) => s.id === existingSlideshowId) || null,
     [bootstrap, existingSlideshowId]
@@ -195,6 +212,7 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
         groupName: selectedGroup,
         files,
       });
+      emitUploadSync({ slideshowId, slideshowName: slideshowLabel });
 
       setSuccess(
         `Uploaded ${result.uploadedCount} photo${result.uploadedCount === 1 ? "" : "s"} to "${slideshowLabel}" → "${selectedGroup}".`
@@ -363,6 +381,25 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
           {files.length > 0 && (
             <p className="text-sm text-gray-600 mt-2">{files.length} image{files.length === 1 ? "" : "s"} selected</p>
           )}
+          {previewItems.length > 0 && (
+            <div className="mt-3 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+              {previewItems.map((item, index) => (
+                <button
+                  key={`${item.file.name}-${index}`}
+                  type="button"
+                  onClick={() => setActivePreviewIndex(index)}
+                  className="group relative rounded-md overflow-hidden border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  title={`Preview ${item.file.name}`}
+                >
+                  <img
+                    src={item.url}
+                    alt={item.file.name}
+                    className="w-full h-20 object-cover transition-transform duration-150 group-hover:scale-105"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {error && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">{error}</div>}
@@ -377,6 +414,38 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
           {isSubmitting ? "Uploading..." : "Upload Photos"}
         </button>
       </div>
+
+      {activePreviewIndex !== null && previewItems[activePreviewIndex] && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+          onClick={() => setActivePreviewIndex(null)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <p className="text-sm font-medium text-gray-800 truncate pr-4">
+                {previewItems[activePreviewIndex].file.name}
+              </p>
+              <button
+                type="button"
+                onClick={() => setActivePreviewIndex(null)}
+                className="px-2 py-1 text-sm text-gray-600 hover:text-gray-900"
+              >
+                Close
+              </button>
+            </div>
+            <div className="bg-black flex items-center justify-center max-h-[80vh]">
+              <img
+                src={previewItems[activePreviewIndex].url}
+                alt={previewItems[activePreviewIndex].file.name}
+                className="max-w-full max-h-[80vh] object-contain"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

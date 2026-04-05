@@ -15,6 +15,8 @@ interface SlideshowManagerProps {
     slideshowName: string;
   };
   onLoadSlideshow: (data: {
+    id?: string;
+    name?: string;
     classData: ClassData;
     selectedMusic: MusicTrack | null;
     backgroundOption: BackgroundOption;
@@ -101,6 +103,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
     try {
       const slideshowData = await backendService.loadSlideshow(fileId);
       onLoadSlideshow(slideshowData);
+      toast(`Loaded "${slideshowData?.slideshowName || slideshowData?.name || 'slideshow'}".`, 'success');
       onClose();
     } catch (error) {
       console.error('Failed to load slideshow:', error);
