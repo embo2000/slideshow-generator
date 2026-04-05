@@ -5,7 +5,14 @@ import express from "express";
 import cors from "cors";
 import multer from "multer";
 import { PrismaClient } from "@prisma/client";
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+  DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const app = express();
@@ -50,6 +57,8 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 const normalizeName = (name) => name.replace(/[^\w.\-]+/g, "_");
+const deriveFileNameFromKey = (key = "") => key.split("/").pop() || key;
+const hashToken = (token) => crypto.createHash("sha256").update(token).digest("hex");
 
 const buildAssetUrl = async (s3Key) => {
   const publicBase = process.env.S3_PUBLIC_URL_BASE;
@@ -68,7 +77,10 @@ const buildAssetUrl = async (s3Key) => {
 };
 
 const mapAssetForClient = async (asset) => {
-  const url = await buildAssetUrl(asset.s3Key);
+  const url =
+    asset.kind === "audio"
+      ? `${apiPrefix}/assets/${asset.id}/content`
+      : await buildAssetUrl(asset.s3Key);
   return {
     id: asset.id,
     name: asset.name,
@@ -78,6 +90,59 @@ const mapAssetForClient = async (asset) => {
     mimeType: asset.mimeType,
     kind: asset.kind,
   };
+};
+
+const inferAudioMimeType = (key = "") => {
+  const lower = key.toLowerCase();
+  if (lower.endsWith(".mp3")) return "audio/mpeg";
+  if (lower.endsWith(".wav")) return "audio/wav";
+  if (lower.endsWith(".ogg")) return "audio/ogg";
+  if (lower.endsWith(".m4a")) return "audio/mp4";
+  if (lower.endsWith(".aac")) return "audio/aac";
+  if (lower.endsWith(".flac")) return "audio/flac";
+  if (lower.endsWith(".webm")) return "audio/webm";
+  return "audio/*";
+};
+
+const displayNameFromFileName = (fileName = "") => {
+  const withoutExt = fileName.replace(/\.[^/.]+$/, "");
+  return withoutExt.replace(/[_-]+/g, " ").trim() || fileName;
+};
+
+const findAssetByIdOrKey = async (idOrKey) => {
+  let asset = await prisma.asset.findUnique({ where: { id: idOrKey } });
+  if (asset) return asset;
+  asset = await prisma.asset.findUnique({ where: { s3Key: idOrKey } });
+  return asset;
+};
+
+const getValidUploadLink = async (token) => {
+  if (!token) return null;
+  const tokenHash = hashToken(token);
+  const uploadLink = await prisma.uploadLink.findUnique({
+    where: { tokenHash },
+  });
+  if (!uploadLink) return null;
+  if (!uploadLink.active) return null;
+  if (uploadLink.expiresAt <= new Date()) return null;
+  return uploadLink;
+};
+
+const pipeS3BodyToResponse = async (body, res) => {
+  if (!body) {
+    res.end();
+    return;
+  }
+  if (typeof body.pipe === "function") {
+    body.pipe(res);
+    return;
+  }
+  if (typeof body.transformToByteArray === "function") {
+    const bytes = await body.transformToByteArray();
+    res.end(Buffer.from(bytes));
+    return;
+  }
+  res.end();
 };
 
 app.get(`${apiPrefix}/health`, async (_req, res) => {
@@ -115,6 +180,213 @@ app.put(`${apiPrefix}/settings/groups`, async (req, res) => {
   res.json({ success: true });
 });
 
+app.post(`${apiPrefix}/intake-links`, async (req, res) => {
+  const expiresInDays = Number(req.body?.expiresInDays ?? 7);
+  const safeDays = Number.isFinite(expiresInDays)
+    ? Math.max(1, Math.min(30, expiresInDays))
+    : 7;
+
+  const token = crypto.randomBytes(24).toString("base64url");
+  const tokenHash = hashToken(token);
+  const expiresAt = new Date(Date.now() + safeDays * 24 * 60 * 60 * 1000);
+
+  const link = await prisma.uploadLink.create({
+    data: {
+      tokenHash,
+      expiresAt,
+      active: true,
+      metadata: req.body?.metadata ?? null,
+    },
+  });
+
+  res.status(201).json({
+    id: link.id,
+    token,
+    expiresAt: link.expiresAt.toISOString(),
+  });
+});
+
+app.get(`${apiPrefix}/intake/:token/bootstrap`, async (req, res) => {
+  const { token } = req.params;
+  const uploadLink = await getValidUploadLink(token);
+  if (!uploadLink) {
+    return res.status(401).json({ error: "Invalid or expired intake token" });
+  }
+
+  const groups = await prisma.appSetting.findUnique({
+    where: { key: "groups" },
+  });
+  const defaultClasses = Array.isArray(groups?.value?.classes) ? groups.value.classes : [];
+
+  const slideshows = await prisma.slideshow.findMany({
+    orderBy: { updatedAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      slideshowName: true,
+      classes: true,
+      updatedAt: true,
+    },
+  });
+
+  res.json({
+    tokenId: uploadLink.id,
+    defaultClasses,
+    slideshows: slideshows.map((item) => ({
+      id: item.id,
+      name: item.name,
+      slideshowName: item.slideshowName,
+      classes: Array.isArray(item.classes) ? item.classes : [],
+      updatedAt: item.updatedAt.toISOString(),
+    })),
+  });
+});
+
+app.post(`${apiPrefix}/intake/:token/slideshows`, async (req, res) => {
+  const { token } = req.params;
+  const uploadLink = await getValidUploadLink(token);
+  if (!uploadLink) {
+    return res.status(401).json({ error: "Invalid or expired intake token" });
+  }
+
+  const providedName = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+  if (!providedName) {
+    return res.status(400).json({ error: "name is required" });
+  }
+
+  const requestedClasses = Array.isArray(req.body?.classes)
+    ? req.body.classes.filter((c) => typeof c === "string" && c.trim())
+    : null;
+  const groups = await prisma.appSetting.findUnique({
+    where: { key: "groups" },
+  });
+  const defaultClasses = Array.isArray(groups?.value?.classes) ? groups.value.classes : [];
+  const classes = requestedClasses && requestedClasses.length > 0 ? requestedClasses : defaultClasses;
+
+  const uniqueName = async (base) => {
+    let candidate = base;
+    let idx = 2;
+    while (await prisma.slideshow.findUnique({ where: { name: candidate } })) {
+      candidate = `${base} (${idx})`;
+      idx += 1;
+    }
+    return candidate;
+  };
+
+  const name = await uniqueName(providedName);
+  const classData = Object.fromEntries((classes || []).map((group) => [group, []]));
+
+  const created = await prisma.slideshow.create({
+    data: {
+      name,
+      slideshowName: name,
+      classes: classes || [],
+      classData,
+      selectedTransition: { id: "fade", name: "Fade", description: "Smooth fade between images" },
+      slideDuration: 3,
+    },
+  });
+
+  res.status(201).json({
+    id: created.id,
+    name: created.name,
+    slideshowName: created.slideshowName,
+    classes: Array.isArray(created.classes) ? created.classes : [],
+    updatedAt: created.updatedAt.toISOString(),
+  });
+});
+
+const intakeUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024, files: 20 },
+});
+
+app.post(`${apiPrefix}/intake/:token/upload`, intakeUpload.array("files", 20), async (req, res) => {
+  const { token } = req.params;
+  const uploadLink = await getValidUploadLink(token);
+  if (!uploadLink) {
+    return res.status(401).json({ error: "Invalid or expired intake token" });
+  }
+
+  const slideshowId = req.body?.slideshowId;
+  const groupName = typeof req.body?.groupName === "string" ? req.body.groupName.trim() : "";
+  if (!slideshowId || !groupName) {
+    return res.status(400).json({ error: "slideshowId and groupName are required" });
+  }
+
+  const files = req.files || [];
+  if (!Array.isArray(files) || files.length === 0) {
+    return res.status(400).json({ error: "At least one file is required" });
+  }
+
+  const slideshow = await prisma.slideshow.findUnique({ where: { id: slideshowId } });
+  if (!slideshow) {
+    return res.status(404).json({ error: "Slideshow not found" });
+  }
+
+  const classes = Array.isArray(slideshow.classes) ? slideshow.classes : [];
+  if (!classes.includes(groupName)) {
+    return res.status(400).json({ error: "Selected group does not exist in slideshow" });
+  }
+
+  const uploadedItems = [];
+  for (const file of files) {
+    if (!file.mimetype?.startsWith("image/")) {
+      continue;
+    }
+
+    const objectKey = `photo/${Date.now()}-${crypto.randomUUID()}-${normalizeName(file.originalname)}`;
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: process.env.S3_BUCKET,
+        Key: objectKey,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+      })
+    );
+
+    const asset = await prisma.asset.create({
+      data: {
+        kind: "photo",
+        name: file.originalname,
+        originalFileName: file.originalname,
+        mimeType: file.mimetype || "application/octet-stream",
+        size: file.size,
+        s3Key: objectKey,
+      },
+    });
+
+    uploadedItems.push({
+      id: asset.id,
+      name: asset.name,
+      url: await buildAssetUrl(asset.s3Key),
+    });
+  }
+
+  if (uploadedItems.length === 0) {
+    return res.status(400).json({ error: "No valid image files found" });
+  }
+
+  const classData = slideshow.classData && typeof slideshow.classData === "object"
+    ? { ...slideshow.classData }
+    : {};
+  const groupItems = Array.isArray(classData[groupName]) ? [...classData[groupName]] : [];
+  groupItems.push(...uploadedItems);
+  classData[groupName] = groupItems;
+
+  await prisma.slideshow.update({
+    where: { id: slideshow.id },
+    data: { classData },
+  });
+
+  res.status(201).json({
+    slideshowId: slideshow.id,
+    groupName,
+    uploadedCount: uploadedItems.length,
+    uploadedItems,
+  });
+});
+
 app.post(`${apiPrefix}/assets/upload`, upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
@@ -122,8 +394,8 @@ app.post(`${apiPrefix}/assets/upload`, upload.single("file"), async (req, res) =
     }
 
     const kind = req.body.kind;
-    if (!["image", "audio", "photo"].includes(kind)) {
-      return res.status(400).json({ error: "kind must be image, audio, or photo" });
+    if (!["image", "audio", "photo", "video"].includes(kind)) {
+      return res.status(400).json({ error: "kind must be image, audio, photo, or video" });
     }
 
     const displayName = (req.body.name || req.file.originalname).trim();
@@ -160,7 +432,81 @@ app.post(`${apiPrefix}/assets/upload`, upload.single("file"), async (req, res) =
 
 app.get(`${apiPrefix}/assets`, async (req, res) => {
   const kind = req.query.kind;
-  const where = ["image", "audio", "photo"].includes(String(kind))
+
+  // Audio library should mirror S3 /audio/ folder content directly.
+  if (String(kind) === "audio") {
+    try {
+      const list = await s3.send(
+        new ListObjectsV2Command({
+          Bucket: process.env.S3_BUCKET,
+          Prefix: "audio/",
+        })
+      );
+
+      const objects = (list.Contents || []).filter((obj) => obj.Key && !obj.Key.endsWith("/"));
+      const keys = objects.map((obj) => obj.Key);
+
+      const existingAssets = keys.length
+        ? await prisma.asset.findMany({ where: { s3Key: { in: keys } } })
+        : [];
+      const assetsByKey = new Map(existingAssets.map((asset) => [asset.s3Key, asset]));
+
+      // Ensure orphan S3 audio files are represented in DB so they can have assignable names.
+      for (const obj of objects) {
+        const key = obj.Key;
+        if (assetsByKey.has(key)) continue;
+
+        const fileName = deriveFileNameFromKey(key);
+        const createdAsset = await prisma.asset.upsert({
+          where: { s3Key: key },
+          update: {
+            // Keep user-assigned name if it already exists; only refresh mutable metadata.
+            mimeType: inferAudioMimeType(key),
+            size: Number(obj.Size || 0),
+            originalFileName: fileName,
+          },
+          data: {
+            kind: "audio",
+            name: displayNameFromFileName(fileName),
+            originalFileName: fileName,
+            mimeType: inferAudioMimeType(key),
+            size: Number(obj.Size || 0),
+            s3Key: key,
+          },
+        });
+        assetsByKey.set(key, createdAsset);
+      }
+
+      const files = await Promise.all(
+        objects.map(async (obj) => {
+          const key = obj.Key;
+          const asset = assetsByKey.get(key);
+          const url = asset?.id
+            ? `${apiPrefix}/assets/${asset.id}/content`
+            : await buildAssetUrl(key);
+          const fileName = deriveFileNameFromKey(key);
+
+          return {
+            id: asset?.id || key,
+            name: asset?.name || displayNameFromFileName(fileName),
+            url,
+            createdTime: (obj.LastModified || asset?.createdAt || new Date()).toISOString(),
+            size: String(obj.Size ?? asset?.size ?? 0),
+            mimeType: asset?.mimeType || inferAudioMimeType(key),
+            kind: "audio",
+          };
+        })
+      );
+
+      files.sort((a, b) => (a.createdTime < b.createdTime ? 1 : -1));
+      return res.json(files);
+    } catch (error) {
+      console.error("Failed to list audio files from S3:", error);
+      return res.status(500).json({ error: "Failed to list audio files from S3" });
+    }
+  }
+
+  const where = ["image", "audio", "photo", "video"].includes(String(kind))
     ? { kind: String(kind) }
     : undefined;
 
@@ -171,6 +517,110 @@ app.get(`${apiPrefix}/assets`, async (req, res) => {
 
   const mapped = await Promise.all(assets.map((asset) => mapAssetForClient(asset)));
   res.json(mapped);
+});
+
+app.get(`${apiPrefix}/assets/:id/content`, async (req, res) => {
+  const { id } = req.params;
+  const asset = await findAssetByIdOrKey(id);
+  if (!asset) {
+    return res.status(404).json({ error: "Asset not found" });
+  }
+
+  const rangeHeader = req.headers.range;
+  try {
+    if (rangeHeader) {
+      const head = await s3.send(
+        new HeadObjectCommand({
+          Bucket: process.env.S3_BUCKET,
+          Key: asset.s3Key,
+        })
+      );
+
+      const total = Number(head.ContentLength || asset.size || 0);
+      const range = rangeHeader.replace(/bytes=/, "").split("-");
+      const start = Number.parseInt(range[0], 10) || 0;
+      const end = range[1] ? Number.parseInt(range[1], 10) : total - 1;
+
+      const chunkEnd = Math.min(end, total - 1);
+      const chunkSize = chunkEnd - start + 1;
+
+      const response = await s3.send(
+        new GetObjectCommand({
+          Bucket: process.env.S3_BUCKET,
+          Key: asset.s3Key,
+          Range: `bytes=${start}-${chunkEnd}`,
+        })
+      );
+
+      res.status(206);
+      res.setHeader("Content-Range", `bytes ${start}-${chunkEnd}/${total}`);
+      res.setHeader("Accept-Ranges", "bytes");
+      res.setHeader("Content-Length", String(chunkSize));
+      res.setHeader("Content-Type", response.ContentType || asset.mimeType || "application/octet-stream");
+      await pipeS3BodyToResponse(response.Body, res);
+      return;
+    }
+
+    const response = await s3.send(
+      new GetObjectCommand({
+        Bucket: process.env.S3_BUCKET,
+        Key: asset.s3Key,
+      })
+    );
+
+    res.setHeader("Content-Type", response.ContentType || asset.mimeType || "application/octet-stream");
+    if (response.ContentLength) {
+      res.setHeader("Content-Length", String(response.ContentLength));
+    }
+    res.setHeader("Accept-Ranges", "bytes");
+    await pipeS3BodyToResponse(response.Body, res);
+  } catch (error) {
+    console.error("Failed to stream asset content:", error);
+    res.status(500).json({ error: "Failed to stream asset" });
+  }
+});
+
+app.patch(`${apiPrefix}/assets/:id`, async (req, res) => {
+  const { id } = req.params;
+  const { name } = req.body ?? {};
+  if (!name || typeof name !== "string" || !name.trim()) {
+    return res.status(400).json({ error: "name is required" });
+  }
+
+  const asset = await findAssetByIdOrKey(id);
+  if (!asset) {
+    return res.status(404).json({ error: "Asset not found" });
+  }
+
+  const updated = await prisma.asset.update({
+    where: { id: asset.id },
+    data: { name: name.trim() },
+  });
+
+  res.json(await mapAssetForClient(updated));
+});
+
+app.delete(`${apiPrefix}/assets/:id`, async (req, res) => {
+  const { id } = req.params;
+  const asset = await findAssetByIdOrKey(id);
+
+  if (!asset) {
+    return res.status(404).json({ error: "Asset not found" });
+  }
+
+  try {
+    await s3.send(
+      new DeleteObjectCommand({
+        Bucket: process.env.S3_BUCKET,
+        Key: asset.s3Key,
+      })
+    );
+  } catch (error) {
+    console.error("Failed deleting asset from S3:", error);
+  }
+
+  await prisma.asset.delete({ where: { id: asset.id } });
+  res.status(204).send();
 });
 
 app.get(`${apiPrefix}/slideshows`, async (_req, res) => {
@@ -203,12 +653,67 @@ app.get(`${apiPrefix}/slideshows/:id`, async (req, res) => {
     return res.status(404).json({ error: "Slideshow not found" });
   }
 
+  const classData = slideshow.classData || {};
+  const classDataWithFreshUrls = {};
+
+  for (const [groupName, images] of Object.entries(classData)) {
+    if (!Array.isArray(images)) {
+      classDataWithFreshUrls[groupName] = [];
+      continue;
+    }
+
+    const mappedImages = await Promise.all(
+      images.map(async (image) => {
+        if (!image || typeof image !== "object") return image;
+        if (!image.id) return image;
+
+        const asset = await prisma.asset.findUnique({ where: { id: image.id } });
+        if (!asset) return image;
+
+        const freshUrl = await buildAssetUrl(asset.s3Key);
+        return {
+          ...image,
+          name: image.name || asset.name,
+          url: freshUrl,
+        };
+      })
+    );
+
+    classDataWithFreshUrls[groupName] = mappedImages;
+  }
+
+  let selectedMusic = slideshow.selectedMusic;
+  if (selectedMusic?.assetId) {
+    const asset = await prisma.asset.findUnique({ where: { id: selectedMusic.assetId } });
+    if (asset) {
+      selectedMusic = {
+        ...selectedMusic,
+        url: `${apiPrefix}/assets/${asset.id}/content`,
+        name: selectedMusic.name || asset.name,
+      };
+    }
+  }
+
+  let backgroundOption = slideshow.backgroundOption;
+  if (backgroundOption?.type === "image" && backgroundOption.image?.assetId) {
+    const asset = await prisma.asset.findUnique({ where: { id: backgroundOption.image.assetId } });
+    if (asset) {
+      backgroundOption = {
+        ...backgroundOption,
+        image: {
+          ...backgroundOption.image,
+          url: await buildAssetUrl(asset.s3Key),
+        },
+      };
+    }
+  }
+
   res.json({
     id: slideshow.id,
     name: slideshow.name,
-    classData: slideshow.classData,
-    selectedMusic: slideshow.selectedMusic,
-    backgroundOption: slideshow.backgroundOption,
+    classData: classDataWithFreshUrls,
+    selectedMusic,
+    backgroundOption,
     selectedTransition: slideshow.selectedTransition,
     classes: slideshow.classes,
     slideDuration: slideshow.slideDuration,

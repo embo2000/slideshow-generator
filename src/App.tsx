@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Save } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Lock } from 'lucide-react';
 import WizardProgress from './components/WizardProgress';
 import WizardNavigation from './components/WizardNavigation';
 import ClassUploadStep from './components/ClassUploadStep';
@@ -10,8 +10,11 @@ import PreviewStep from './components/PreviewStep';
 import VideoGenerator from './components/VideoGenerator';
 import SettingsModal from './components/SettingsModal';
 import SlideshowManager from './components/SlideshowManager';
-import { backendService } from './services/api';
+import GoogleAuthButton from './components/GoogleAuthButton';
+import type { GoogleUser } from './services/googleAuth';
+import { backendService, StoredFile } from './services/api';
 import { ClassData, MusicTrack, BackgroundOption, TransitionType } from './types';
+import { useDialog } from './components/ui/DialogProvider';
 
 const TRANSITION_TYPES: TransitionType[] = [
   { id: 'fade', name: 'Fade', description: 'Smooth fade between images' },
@@ -32,13 +35,16 @@ const DEFAULT_CLASSES = [
 const MUSIC_TRACKS: MusicTrack[] = [];
 
 function App() {
+  const { alertDialog, confirmDialog, promptDialog, toast } = useDialog();
   const [classes, setClasses] = useState<string[]>(DEFAULT_CLASSES);
+  const [defaultClasses, setDefaultClasses] = useState<string[]>(DEFAULT_CLASSES);
   const [classData, setClassData] = useState<ClassData>({});
   const [currentStep, setCurrentStep] = useState(0);
   const [showVideoGenerator, setShowVideoGenerator] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [selectedMusic, setSelectedMusic] = useState<MusicTrack | null>(null);
   const [weeklyMusic, setWeeklyMusic] = useState<MusicTrack | null>(null);
+  const [currentUser, setCurrentUser] = useState<GoogleUser | null>(null);
   const [backgroundOption, setBackgroundOption] = useState<BackgroundOption>({ type: 'none' });
   const [selectedTransition, setSelectedTransition] = useState<TransitionType>(TRANSITION_TYPES[0]);
   const [showSlideshowManager, setShowSlideshowManager] = useState(false);
@@ -83,14 +89,22 @@ function App() {
     size?: string;
   }>>([]);
   const [customMusicTracks, setCustomMusicTracks] = useState<MusicTrack[]>([]);
+  const stepAutoSaveInProgressRef = useRef(false);
+  const stepAutoSaveQueuedRef = useRef(false);
+  const uploadedPhotoAssetsRef = useRef<WeakMap<File, StoredFile>>(new WeakMap());
+  const uploadingPhotoAssetsRef = useRef<WeakMap<File, Promise<StoredFile>>>(new WeakMap());
+  const uploadingMusicTrackIdsRef = useRef<Set<string>>(new Set());
 
   // Load app settings and asset libraries
   useEffect(() => {
+    if (!currentUser) return;
+
     const loadAppData = async () => {
       try {
         const savedClasses = await backendService.loadGroupsSettings();
         if (savedClasses && savedClasses.length > 0) {
           setClasses(savedClasses);
+          setDefaultClasses(savedClasses);
           const newClassData: ClassData = {};
           savedClasses.forEach(className => {
             newClassData[className] = classData[className] || [];
@@ -110,7 +124,7 @@ function App() {
     };
 
     loadAppData();
-  }, []);
+  }, [currentUser]);
 
   // Initialize weekly music selection
   useEffect(() => {
@@ -119,11 +133,41 @@ function App() {
     setSelectedMusic(null);
   }, []);
 
+  const ensurePhotoUploaded = async (file: File): Promise<StoredFile> => {
+    const cached = uploadedPhotoAssetsRef.current.get(file);
+    if (cached) return cached;
+
+    const inFlight = uploadingPhotoAssetsRef.current.get(file);
+    if (inFlight) return inFlight;
+
+    const uploadPromise = backendService.uploadAsset(file, 'photo', file.name)
+      .then((uploaded) => {
+        uploadedPhotoAssetsRef.current.set(file, uploaded);
+        uploadingPhotoAssetsRef.current.delete(file);
+        return uploaded;
+      })
+      .catch((error) => {
+        uploadingPhotoAssetsRef.current.delete(file);
+        throw error;
+      });
+
+    uploadingPhotoAssetsRef.current.set(file, uploadPromise);
+    return uploadPromise;
+  };
+
   const updateClassPhotos = (className: string, photos: File[]) => {
     setClassData(prev => ({
       ...prev,
       [className]: photos
     }));
+
+    photos.forEach((file) => {
+      if (!uploadedPhotoAssetsRef.current.get(file)) {
+        ensurePhotoUploaded(file).catch((error) => {
+          console.error(`Failed to upload photo "${file.name}"`, error);
+        });
+      }
+    });
   };
 
 const getTotalPhotos = () => {
@@ -181,6 +225,79 @@ const getTotalPhotos = () => {
     });
   };
 
+  const handleBackgroundOptionUpdate = (option: BackgroundOption) => {
+    setBackgroundOption(option);
+
+    if (option.type === 'image' && option.image?.file && !option.image.assetId) {
+      backendService.uploadAsset(option.image.file, 'image', option.image.file.name)
+        .then((uploaded) => {
+          setBackgroundOption((prev) => {
+            if (prev.type !== 'image' || !prev.image || prev.image.file !== option.image?.file) {
+              return prev;
+            }
+            return {
+              ...prev,
+              image: {
+                ...prev.image,
+                assetId: uploaded.id,
+                url: uploaded.url,
+              },
+            };
+          });
+
+          setExistingBackgroundImages((prev) => [
+            uploaded,
+            ...prev.filter((item) => item.id !== uploaded.id),
+          ]);
+        })
+        .catch((error) => {
+          console.error('Failed to upload background image:', error);
+        });
+    }
+  };
+
+  const uploadMusicTrackIfNeeded = (track: MusicTrack) => {
+    if (!track.file || track.assetId || uploadingMusicTrackIdsRef.current.has(track.id)) {
+      return;
+    }
+
+    uploadingMusicTrackIdsRef.current.add(track.id);
+    backendService.uploadAsset(track.file, 'audio', track.name)
+      .then((uploaded) => {
+        setSelectedMusic((prev) => {
+          if (!prev || prev.id !== track.id) return prev;
+          return { ...prev, assetId: uploaded.id, url: uploaded.url };
+        });
+        setCustomMusicTracks((prev) => prev.map((item) => (
+          item.id === track.id ? { ...item, assetId: uploaded.id, url: uploaded.url } : item
+        )));
+        setExistingMusicFiles((prev) => [
+          uploaded,
+          ...prev.filter((item) => item.id !== uploaded.id),
+        ]);
+      })
+      .catch((error) => {
+        console.error('Failed to upload music track:', error);
+      })
+      .finally(() => {
+        uploadingMusicTrackIdsRef.current.delete(track.id);
+      });
+  };
+
+  const handleSelectMusic = (track: MusicTrack | null) => {
+    setSelectedMusic(track);
+    if (track) {
+      uploadMusicTrackIfNeeded(track);
+    }
+  };
+
+  const handleCustomTracksUpdate = (tracks: MusicTrack[]) => {
+    setCustomMusicTracks(tracks);
+    tracks.forEach((track) => {
+      uploadMusicTrackIfNeeded(track);
+    });
+  };
+
   const handleLoadExistingMusic = (musicData: {
     id: string;
     name: string;
@@ -192,7 +309,7 @@ const getTotalPhotos = () => {
     const audio = new Audio(musicData.url);
     audio.addEventListener('loadedmetadata', () => {
       const durationInSeconds = Math.round(audio.duration);
-      setSelectedMusic({
+      handleSelectMusic({
         id: musicData.id,
         name: musicData.name,
         title: musicData.name,
@@ -206,7 +323,7 @@ const getTotalPhotos = () => {
     audio.addEventListener('error', () => {
       console.error('Failed to load audio metadata for:', musicData.name);
       // Set music without duration if metadata loading fails
-      setSelectedMusic({
+      handleSelectMusic({
         id: musicData.id,
         name: musicData.name,
         title: musicData.name,
@@ -219,6 +336,45 @@ const getTotalPhotos = () => {
     
     // Load the audio to trigger metadata loading
     audio.load();
+  };
+
+  const handleRenameExistingMusic = async (musicId: string, newName: string) => {
+    const updated = await backendService.renameAsset(musicId, newName);
+    setExistingMusicFiles((prev) => prev.map((item) => (
+      item.id === musicId ? { ...item, name: updated.name } : item
+    )));
+    setSelectedMusic((prev) => (
+      prev?.assetId === musicId ? { ...prev, name: updated.name, title: updated.name } : prev
+    ));
+  };
+
+  const handleDeleteExistingMusic = async (musicId: string) => {
+    await backendService.deleteAsset(musicId);
+    setExistingMusicFiles((prev) => prev.filter((item) => item.id !== musicId));
+    setSelectedMusic((prev) => (prev?.assetId === musicId ? null : prev));
+  };
+
+  const handleCreateUploadLink = async () => {
+    try {
+      const created = await backendService.createIntakeLink(7);
+      const intakeUrl = `${window.location.origin}/intake/${created.token}`;
+
+      try {
+        await navigator.clipboard.writeText(intakeUrl);
+        toast('Upload link created and copied to clipboard.', 'success');
+      } catch {
+        await promptDialog('Copy this upload link:', intakeUrl, {
+          title: 'Upload Link',
+          confirmText: 'Done',
+          cancelText: 'Close',
+        });
+      }
+    } catch (error) {
+      console.error('Failed to create upload link:', error);
+      await alertDialog('Failed to create upload link. Please try again.', {
+        title: 'Upload Link Error',
+      });
+    }
   };
 
   const canProceedFromCurrentStep = () => {
@@ -282,6 +438,9 @@ const handleLoadSlideshow = (data: {
                     ? img
                     : `data:image/jpeg;base64,${img}`;
                   const response = await fetch(imageSource);
+                  if (!response.ok) {
+                    throw new Error(`Failed to fetch image source (${response.status})`);
+                  }
                   const blob = await response.blob();
                   return new File(
                     [blob],
@@ -294,6 +453,9 @@ const handleLoadSlideshow = (data: {
                 if (img && typeof img === 'object' && img.data) {
                   const base64Data = `data:image/jpeg;base64,${img.data}`;
                   const response = await fetch(base64Data);
+                  if (!response.ok) {
+                    throw new Error(`Failed to fetch base64 image (${response.status})`);
+                  }
                   const blob = await response.blob();
                   return new File([blob], `${className}-image-${index + 1}.jpg`, { type: 'image/jpeg' });
                 }
@@ -301,12 +463,24 @@ const handleLoadSlideshow = (data: {
                 // If it's an object with URL from backend storage
                 if (img && typeof img === 'object' && img.url) {
                   const response = await fetch(img.url);
+                  if (!response.ok) {
+                    throw new Error(`Failed to fetch image URL (${response.status})`);
+                  }
                   const blob = await response.blob();
-                  return new File(
+                  const loadedFile = new File(
                     [blob],
                     img.name || `${className}-image-${index + 1}.${blob.type.split('/')[1] || 'jpg'}`,
                     { type: blob.type || 'image/jpeg' }
                   );
+                  if (img.id) {
+                    uploadedPhotoAssetsRef.current.set(loadedFile, {
+                      id: img.id,
+                      name: img.name || loadedFile.name,
+                      url: img.url,
+                      createdTime: img.createdTime || new Date().toISOString(),
+                    });
+                  }
+                  return loadedFile;
                 }
                 
                 console.warn('Unknown image format:', img);
@@ -506,33 +680,55 @@ const normalizeLoadedClassData = (loaded: any) => {
     });
     
     setClasses(newClasses);
+    setDefaultClasses(newClasses);
     setClassData(newClassData);
 
     try {
       await backendService.saveGroupsSettings(newClasses);
+
+      // Persist group changes immediately on the active slideshow as well.
+      await backendService.saveSlideshow({
+        name: slideshowName,
+        classData: newClassData,
+        selectedMusic,
+        backgroundOption,
+        selectedTransition,
+        classes: newClasses,
+        slideDuration,
+        slideshowName,
+        uploadedPhotoAssets: uploadedPhotoAssetsRef.current,
+      });
     } catch (error) {
-      console.error('Failed to save groups settings:', error);
+      console.error('Failed to save groups settings/current slideshow:', error);
     }
   };
 
   const handleNext = () => {
     if (currentStep < totalSteps - 1) {
       setCurrentStep(currentStep + 1);
+      triggerStepAutoSave();
     }
   };
 
   const handlePrevious = () => {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
+      triggerStepAutoSave();
     }
   };
 
   const handleEditStep = (stepIndex: number) => {
     setCurrentStep(stepIndex);
+    triggerStepAutoSave();
+  };
+
+  const handleStepClick = (stepIndex: number) => {
+    setCurrentStep(stepIndex);
+    triggerStepAutoSave();
   };
 
   const handleAutoSave = async () => {
-    if (!slideshowName.trim() || getTotalPhotos() === 0) {
+    if (!slideshowName.trim()) {
       return;
     }
 
@@ -546,6 +742,7 @@ const normalizeLoadedClassData = (loaded: any) => {
         classes,
         slideDuration,
         slideshowName,
+        uploadedPhotoAssets: uploadedPhotoAssetsRef.current,
       });
       console.log('Auto-save successful for:', slideshowName);
     } catch (error) {
@@ -553,25 +750,58 @@ const normalizeLoadedClassData = (loaded: any) => {
     }
   };
 
+  const triggerStepAutoSave = () => {
+    if (!slideshowName.trim()) {
+      return;
+    }
+
+    if (stepAutoSaveInProgressRef.current) {
+      stepAutoSaveQueuedRef.current = true;
+      return;
+    }
+
+    stepAutoSaveInProgressRef.current = true;
+
+    const runAutoSave = async () => {
+      do {
+        stepAutoSaveQueuedRef.current = false;
+        await handleAutoSave();
+      } while (stepAutoSaveQueuedRef.current);
+      stepAutoSaveInProgressRef.current = false;
+    };
+
+    runAutoSave().catch((error) => {
+      console.error('Step auto-save failed:', error);
+      stepAutoSaveInProgressRef.current = false;
+    });
+  };
+
   const generateVideo = () => {
     if (getTotalPhotos() === 0) return;
     setShowVideoGenerator(true);
   };
 
-  const handleNewSlideshow = () => {
+  const handleNewSlideshow = async () => {
     if (getTotalPhotos() > 0 || selectedMusic || backgroundOption.type !== 'none') {
-      const confirmReset = window.confirm(
-        'Are you sure you want to start a new slideshow? This will clear all current photos, music, and settings.'
+      const confirmReset = await confirmDialog(
+        'Are you sure you want to start a new slideshow? This will clear all current photos, music, and settings.',
+        {
+          title: 'Start New Slideshow',
+          confirmText: 'Start New',
+          cancelText: 'Keep Current',
+          danger: true,
+        }
       );
       if (!confirmReset) return;
     }
 
     // Reset all slideshow data
     const newClassData: ClassData = {};
-    classes.forEach(className => {
+    defaultClasses.forEach(className => {
       newClassData[className] = [];
     });
     
+    setClasses(defaultClasses);
     setClassData(newClassData);
     setSelectedMusic(null);
     setWeeklyMusic(null);
@@ -631,7 +861,7 @@ const normalizeLoadedClassData = (loaded: any) => {
       return (
         <BackgroundStep
           backgroundOption={backgroundOption}
-          onBackgroundOptionUpdate={setBackgroundOption}
+          onBackgroundOptionUpdate={handleBackgroundOptionUpdate}
           existingBackgroundImages={existingBackgroundImages}
           onLoadExistingImage={handleLoadExistingBackgroundImage}
         />
@@ -643,11 +873,13 @@ const normalizeLoadedClassData = (loaded: any) => {
           tracks={MUSIC_TRACKS}
           selectedTrack={selectedMusic}
           weeklyTrack={weeklyMusic}
-          onSelectTrack={setSelectedMusic}
+          onSelectTrack={handleSelectMusic}
           existingMusicFiles={existingMusicFiles}
           onLoadExistingMusic={handleLoadExistingMusic}
+          onRenameExistingMusic={handleRenameExistingMusic}
+          onDeleteExistingMusic={handleDeleteExistingMusic}
           customTracks={customMusicTracks}
-          onCustomTracksUpdate={setCustomMusicTracks}
+          onCustomTracksUpdate={handleCustomTracksUpdate}
         />
       );
     } else if (currentStep === classes.length + 3) {
@@ -670,6 +902,25 @@ const normalizeLoadedClassData = (loaded: any) => {
       );
     }
   };
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white rounded-xl shadow-sm border p-8 text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-teal-100 text-teal-700 mb-4">
+            <Lock className="h-6 w-6" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900">Sign in required</h1>
+          <p className="text-sm text-gray-600 mt-2 mb-6">
+            Please sign in with Google to access your slideshow workspace.
+          </p>
+          <div className="flex justify-center">
+            <GoogleAuthButton onAuthChange={setCurrentUser} />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -710,18 +961,12 @@ const normalizeLoadedClassData = (loaded: any) => {
                 </svg>
                 New Slideshow
               </button>
-              <button
-                onClick={() => setShowSettings(true)}
-                className="inline-flex items-center px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors duration-200 shadow-sm"
-              >
-                Manage Groups
-              </button>
-              <button
-                onClick={() => setShowSlideshowManager(true)}
-                className="inline-flex items-center px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium transition-colors duration-200 shadow-sm"
-              >
-                My Slideshows
-              </button>
+              <GoogleAuthButton
+                onAuthChange={setCurrentUser}
+                onShowSettings={() => setShowSettings(true)}
+                onShowSlideshowManager={() => setShowSlideshowManager(true)}
+                onCreateUploadLink={handleCreateUploadLink}
+              />
             </div>
           </div>
         </div>
@@ -733,7 +978,7 @@ const normalizeLoadedClassData = (loaded: any) => {
         totalSteps={totalSteps}
         stepTitles={getStepTitles()}
         completedSteps={getCompletedSteps()}
-        onStepClick={setCurrentStep}
+        onStepClick={handleStepClick}
       />
 
       {/* Main Content */}

@@ -1,24 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { LogIn, LogOut, User, ChevronDown, Settings, Save } from 'lucide-react';
+import { LogIn, LogOut, User, ChevronDown, Settings, Save, Link2 } from 'lucide-react';
 import { googleAuthService, GoogleUser } from '../services/googleAuth';
+import { useDialog } from './ui/DialogProvider';
 
 interface GoogleAuthButtonProps {
   onAuthChange?: (user: GoogleUser | null) => void;
   onShowSettings?: () => void;
   onShowSlideshowManager?: () => void;
+  onCreateUploadLink?: () => void | Promise<void>;
 }
 
 const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({ 
   onAuthChange, 
   onShowSettings, 
-  onShowSlideshowManager 
+  onShowSlideshowManager,
+  onCreateUploadLink
 }) => {
+  const { alertDialog } = useDialog();
   const [user, setUser] = useState<GoogleUser | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [sessionStatus, setSessionStatus] = useState<'active' | 'expiring' | 'expired'>('active');
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -84,6 +89,10 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
     return () => clearInterval(interval);
   }, [user]);
 
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [user?.picture]);
+
   const handleSignIn = async () => {
     setIsLoading(true);
     googleAuthService.signIn()
@@ -93,7 +102,9 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
       })
       .catch((error) => {
         console.error('Sign in failed:', error);
-        alert('Failed to sign in with Google. Please try again.');
+        void alertDialog('Failed to sign in with Google. Please try again.', {
+          title: 'Sign-In Error',
+        });
       })
       .finally(() => {
         setIsLoading(false);
@@ -148,6 +159,8 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
   }
 
   if (user) {
+    const showAvatarImage = !!user.picture && !avatarLoadFailed;
+
     return (
       <div className="relative profile-dropdown">
         <button
@@ -157,14 +170,27 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
             sessionStatus === 'expired' ? 'ring-2 ring-red-400' : ''
           }`}
         >
-          <img
-            src={user.picture}
-            alt={user.name}
-            className={`w-8 h-8 rounded-full ${
-              sessionStatus === 'expiring' ? 'ring-2 ring-yellow-400' : 
-              sessionStatus === 'expired' ? 'ring-2 ring-red-400' : ''
-            }`}
-          />
+          {showAvatarImage ? (
+            <img
+              src={user.picture}
+              alt={user.name}
+              onError={() => setAvatarLoadFailed(true)}
+              className={`w-8 h-8 rounded-full ${
+                sessionStatus === 'expiring' ? 'ring-2 ring-yellow-400' : 
+                sessionStatus === 'expired' ? 'ring-2 ring-red-400' : ''
+              }`}
+            />
+          ) : (
+            <div
+              className={`w-8 h-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center ${
+                sessionStatus === 'expiring' ? 'ring-2 ring-yellow-400' : 
+                sessionStatus === 'expired' ? 'ring-2 ring-red-400' : ''
+              }`}
+              aria-label={user.name}
+            >
+              <User className="h-4 w-4" />
+            </div>
+          )}
           <div className="hidden sm:block">
             <p className="text-sm font-medium text-gray-900">{user.name}</p>
             <p className={`text-xs ${
@@ -217,6 +243,16 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
             >
               <Save className="h-4 w-4 mr-2" />
               My Slideshows
+            </button>
+            <button
+              onClick={() => {
+                onCreateUploadLink?.();
+                setShowDropdown(false);
+              }}
+              className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <Link2 className="h-4 w-4 mr-2" />
+              Create Upload Link
             </button>
             <button
               onClick={() => {

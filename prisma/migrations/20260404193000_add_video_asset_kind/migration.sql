@@ -1,0 +1,1 @@
+ALTER TYPE "AssetKind" ADD VALUE IF NOT EXISTS 'video';

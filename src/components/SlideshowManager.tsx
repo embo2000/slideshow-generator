@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Save, FolderOpen, Trash2, Calendar, Clock } from 'lucide-react';
 import { backendService, StoredSlideshow } from '../services/api';
 import { ClassData, MusicTrack, BackgroundOption, TransitionType } from '../types';
+import { useDialog } from './ui/DialogProvider';
 
 interface SlideshowManagerProps {
   currentSlideshow: {
@@ -30,6 +31,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
   onLoadSlideshow,
   onClose
 }) => {
+  const { alertDialog, confirmDialog, toast } = useDialog();
   const [savedSlideshows, setSavedSlideshows] = useState<StoredSlideshow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -54,7 +56,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
       setSavedSlideshows(slideshows);
     } catch (error) {
       console.error('Failed to load slideshows:', error);
-      alert('Failed to load saved slideshows');
+      void alertDialog('Failed to load saved slideshows', { title: 'Load Error' });
     } finally {
       setIsLoading(false);
     }
@@ -62,7 +64,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
 
   const handleSave = async () => {
     if (!slideshowName.trim()) {
-      alert('Please enter a name for your slideshow');
+      await alertDialog('Please enter a name for your slideshow', { title: 'Missing Name' });
       return;
     }
 
@@ -79,7 +81,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
         slideshowName: currentSlideshow.slideshowName
       });
       
-      alert('Slideshow saved successfully!');
+      toast('Slideshow saved successfully.', 'success');
       setSlideshowName('');
       await loadSlideshows();
       // Add a small delay before switching tabs to ensure the file appears
@@ -88,7 +90,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
       }, 500);
     } catch (error) {
       console.error('Failed to save slideshow:', error);
-      alert('Failed to save slideshow. Please try again.');
+      await alertDialog('Failed to save slideshow. Please try again.', { title: 'Save Error' });
     } finally {
       setIsSaving(false);
     }
@@ -102,23 +104,30 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({
       onClose();
     } catch (error) {
       console.error('Failed to load slideshow:', error);
-      alert('Failed to load slideshow. Please try again.');
+      await alertDialog('Failed to load slideshow. Please try again.', { title: 'Load Error' });
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleDelete = async (fileId: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete "${name}"?`)) {
+    const shouldDelete = await confirmDialog(`Are you sure you want to delete "${name}"?`, {
+      title: 'Delete Slideshow',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      danger: true,
+    });
+    if (!shouldDelete) {
       return;
     }
 
     try {
       await backendService.deleteSlideshow(fileId);
       await loadSlideshows();
+      toast('Slideshow deleted.', 'success');
     } catch (error) {
       console.error('Failed to delete slideshow:', error);
-      alert('Failed to delete slideshow. Please try again.');
+      await alertDialog('Failed to delete slideshow. Please try again.', { title: 'Delete Error' });
     }
   };
 

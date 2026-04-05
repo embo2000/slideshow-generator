@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Download, Play, Pause, RotateCcw } from 'lucide-react';
 import { ClassData, MusicTrack, BackgroundOption, TransitionType } from '../types';
+import { backendService, StoredFile } from '../services/api';
 
 interface VideoGeneratorProps {
   classData: ClassData;
@@ -26,6 +27,9 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
   const [progress, setProgress] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isUploadingVideo, setIsUploadingVideo] = useState(false);
+  const [uploadedVideo, setUploadedVideo] = useState<StoredFile | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   
   // Track previous image dimensions for smooth transitions
   const [prevImageDimensions, setPrevImageDimensions] = useState<{
@@ -240,6 +244,8 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
     setIsGenerating(true);
     setProgress(0);
     setVideoUrl(null);
+    setUploadedVideo(null);
+    setUploadError(null);
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -330,11 +336,28 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
       }
     };
 
-    mediaRecorder.onstop = () => {
+    mediaRecorder.onstop = async () => {
       const blob = new Blob(chunks, { type: 'video/webm' });
       const url = URL.createObjectURL(blob);
       setVideoUrl(url);
       setIsGenerating(false);
+
+      const generatedFile = new File(
+        [blob],
+        `${slideshowName?.trim() ? slideshowName.trim() : 'slideshow'}.webm`,
+        { type: 'video/webm' }
+      );
+
+      setIsUploadingVideo(true);
+      try {
+        const uploaded = await backendService.uploadAsset(generatedFile, 'video', generatedFile.name);
+        setUploadedVideo(uploaded);
+      } catch (error) {
+        console.error('Failed to upload generated video:', error);
+        setUploadError('Generated video upload to S3 failed.');
+      } finally {
+        setIsUploadingVideo(false);
+      }
       
       // Stop background music
       if (backgroundAudio) {
@@ -610,6 +633,9 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
 
   const resetGenerator = () => {
     setVideoUrl(null);
+    setUploadedVideo(null);
+    setUploadError(null);
+    setIsUploadingVideo(false);
     setProgress(0);
     setIsGenerating(false);
   };
@@ -684,6 +710,19 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
                     Reset
                   </button>
                 </div>
+              </div>
+              <div className="mt-3 text-sm">
+                {isUploadingVideo && (
+                  <span className="text-blue-700">Uploading generated video to S3...</span>
+                )}
+                {!isUploadingVideo && uploadedVideo && (
+                  <span className="text-green-700">
+                    Generated video saved to S3 as <strong>{uploadedVideo.name}</strong>.
+                  </span>
+                )}
+                {!isUploadingVideo && uploadError && (
+                  <span className="text-red-700">{uploadError}</span>
+                )}
               </div>
             </div>
           )}

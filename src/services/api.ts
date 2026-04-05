@@ -7,7 +7,7 @@ export interface StoredFile {
   createdTime: string;
   size?: string;
   mimeType?: string;
-  kind?: "image" | "audio" | "photo";
+  kind?: "image" | "audio" | "photo" | "video";
 }
 
 export interface StoredSlideshow {
@@ -15,6 +15,18 @@ export interface StoredSlideshow {
   name: string;
   createdTime: string;
   modifiedTime: string;
+}
+
+export interface IntakeBootstrap {
+  tokenId: string;
+  defaultClasses: string[];
+  slideshows: Array<{
+    id: string;
+    name: string;
+    slideshowName: string;
+    classes: string[];
+    updatedAt: string;
+  }>;
 }
 
 export interface SlideshowPayload {
@@ -53,7 +65,7 @@ const apiFetch = async <T>(path: string, init?: RequestInit): Promise<T> => {
 
 const uploadAsset = async (
   file: File,
-  kind: "image" | "audio" | "photo",
+  kind: "image" | "audio" | "photo" | "video",
   name?: string
 ): Promise<StoredFile> => {
   const form = new FormData();
@@ -73,13 +85,20 @@ const uploadAsset = async (
   return response.json() as Promise<StoredFile>;
 };
 
-const serializeClassData = async (classData: ClassData) => {
+const serializeClassData = async (
+  classData: ClassData,
+  uploadedPhotoAssets?: WeakMap<File, StoredFile>
+) => {
   const result: Record<string, Array<{ id: string; name: string; url: string }>> = {};
 
   for (const [className, files] of Object.entries(classData)) {
     result[className] = [];
     for (const file of files) {
-      const uploaded = await uploadAsset(file, "photo", file.name);
+      const uploadedFromCache = uploadedPhotoAssets?.get(file);
+      const uploaded = uploadedFromCache ?? (await uploadAsset(file, "photo", file.name));
+      if (!uploadedFromCache && uploadedPhotoAssets) {
+        uploadedPhotoAssets.set(file, uploaded);
+      }
       result[className].push({
         id: uploaded.id,
         name: uploaded.name,
@@ -100,11 +119,15 @@ const saveSlideshow = async (params: {
   classes: string[];
   slideDuration: number;
   slideshowName: string;
+  uploadedPhotoAssets?: WeakMap<File, StoredFile>;
 }): Promise<StoredSlideshow> => {
-  const uploadedClassData = await serializeClassData(params.classData);
+  const uploadedClassData = await serializeClassData(
+    params.classData,
+    params.uploadedPhotoAssets
+  );
 
   let selectedMusic = params.selectedMusic;
-  if (params.selectedMusic?.file) {
+  if (params.selectedMusic?.file && !params.selectedMusic.assetId) {
     const uploadedMusic = await uploadAsset(
       params.selectedMusic.file,
       "audio",
@@ -119,7 +142,11 @@ const saveSlideshow = async (params: {
   }
 
   let backgroundOption = params.backgroundOption;
-  if (params.backgroundOption.type === "image" && params.backgroundOption.image?.file) {
+  if (
+    params.backgroundOption.type === "image" &&
+    params.backgroundOption.image?.file &&
+    !params.backgroundOption.image.assetId
+  ) {
     const uploadedBackground = await uploadAsset(
       params.backgroundOption.image.file,
       "image",
@@ -153,6 +180,13 @@ const saveSlideshow = async (params: {
 
 export const backendService = {
   saveSlideshow,
+  uploadAsset,
+  renameAsset: (id: string, name: string) =>
+    apiFetch<StoredFile>(`/assets/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+    }),
+  deleteAsset: (id: string) => apiFetch<void>(`/assets/${id}`, { method: "DELETE" }),
   listSlideshows: () => apiFetch<StoredSlideshow[]>("/slideshows"),
   loadSlideshow: (id: string) => apiFetch<any>(`/slideshows/${id}`),
   deleteSlideshow: (id: string) => apiFetch<void>(`/slideshows/${id}`, { method: "DELETE" }),
@@ -167,4 +201,45 @@ export const backendService = {
       method: "PUT",
       body: JSON.stringify({ classes }),
     }),
+  createIntakeLink: (expiresInDays = 7, metadata?: unknown) =>
+    apiFetch<{ id: string; token: string; expiresAt: string }>("/intake-links", {
+      method: "POST",
+      body: JSON.stringify({ expiresInDays, metadata }),
+    }),
+  intakeBootstrap: (token: string) =>
+    apiFetch<IntakeBootstrap>(`/intake/${encodeURIComponent(token)}/bootstrap`),
+  intakeCreateSlideshow: (token: string, payload: { name: string; classes?: string[] }) =>
+    apiFetch<{
+      id: string;
+      name: string;
+      slideshowName: string;
+      classes: string[];
+      updatedAt: string;
+    }>(`/intake/${encodeURIComponent(token)}/slideshows`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  intakeUploadPhotos: async (
+    token: string,
+    payload: { slideshowId: string; groupName: string; files: File[] }
+  ) => {
+    const form = new FormData();
+    form.append("slideshowId", payload.slideshowId);
+    form.append("groupName", payload.groupName);
+    payload.files.forEach((file) => form.append("files", file));
+
+    const response = await fetch(`${apiBase}/intake/${encodeURIComponent(token)}/upload`, {
+      method: "POST",
+      body: form,
+    });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    return response.json() as Promise<{
+      slideshowId: string;
+      groupName: string;
+      uploadedCount: number;
+      uploadedItems: Array<{ id: string; name: string; url: string }>;
+    }>;
+  },
 };

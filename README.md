@@ -15,6 +15,7 @@ A step-by-step slideshow generator with a production-ready backend for:
 - **Custom background images**
 - **Backend persistence** for saving/loading slideshows
 - **S3 asset storage** for uploaded media
+- **Optional Google login UI** for account sign-in
 - **High-quality video export** (1080p)
 
 ## Architecture
@@ -39,6 +40,7 @@ Optional:
 - `S3_ENDPOINT` (for MinIO/R2/Spaces/etc.)
 - `S3_FORCE_PATH_STYLE=true` for many S3-compatible providers
 - `S3_PUBLIC_URL_BASE` for public object URLs instead of signed URLs
+- `VITE_GOOGLE_CLIENT_ID` and `VITE_GOOGLE_API_KEY` to enable Google login button
 
 ## Getting Started
 

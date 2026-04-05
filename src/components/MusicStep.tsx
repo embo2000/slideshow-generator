@@ -1,13 +1,14 @@
-import React, { useState, useRef } from 'react';
-import { Music, Play, Pause, Volume2, Star, Upload, Link, X, Plus } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Music, Play, Pause, Volume2, Upload, Link, X, Plus, Pencil, Trash2 } from 'lucide-react';
 import { MusicTrack } from '../types';
 import WizardStepWrapper from './WizardStepWrapper';
+import { useDialog } from './ui/DialogProvider';
 
 interface MusicStepProps {
   tracks: MusicTrack[];
   selectedTrack: MusicTrack | null;
   weeklyTrack: MusicTrack | null;
-  onSelectTrack: (track: MusicTrack) => void;
+  onSelectTrack: (track: MusicTrack | null) => void;
   existingMusicFiles?: Array<{
     id: string;
     name: string;
@@ -16,6 +17,8 @@ interface MusicStepProps {
     size?: string;
   }>;
   onLoadExistingMusic?: (musicData: { id: string; url: string; name: string }) => void;
+  onRenameExistingMusic?: (musicId: string, newName: string) => Promise<void> | void;
+  onDeleteExistingMusic?: (musicId: string) => Promise<void> | void;
   customTracks?: MusicTrack[];
   onCustomTracksUpdate?: (tracks: MusicTrack[]) => void;
 }
@@ -27,22 +30,37 @@ const MusicStep: React.FC<MusicStepProps> = ({
   onSelectTrack,
   existingMusicFiles = [],
   onLoadExistingMusic,
+  onRenameExistingMusic,
+  onDeleteExistingMusic,
   customTracks = [],
   onCustomTracksUpdate
 }) => {
+  const { alertDialog, confirmDialog, promptDialog, toast } = useDialog();
   const [playingTrack, setPlayingTrack] = useState<string | null>(null);
   const [audioRefs] = useState<{ [key: string]: HTMLAudioElement }>({});
   const [showAddOptions, setShowAddOptions] = useState(false);
   const [audioUrl, setAudioUrl] = useState('');
   const [audioName, setAudioName] = useState('');
-  const [editingTrack, setEditingTrack] = useState<string | null>(null);
-  const [editingName, setEditingName] = useState('');
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [pendingFileName, setPendingFileName] = useState('');
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const allTracks = [...tracks, ...customTracks];
+
+  // Ensure any preview audio stops when leaving this step (e.g. clicking Next).
+  useEffect(() => {
+    return () => {
+      Object.values(audioRefs).forEach((audio) => {
+        try {
+          audio.pause();
+          audio.currentTime = 0;
+        } catch (error) {
+          console.warn('Failed to stop preview audio on unmount:', error);
+        }
+      });
+    };
+  }, [audioRefs]);
 
   const togglePlay = (track: MusicTrack) => {
     if (playingTrack === track.id) {
@@ -68,6 +86,7 @@ const MusicStep: React.FC<MusicStepProps> = ({
         const audio = new Audio(track.url);
         audio.volume = 0.5;
         audio.preload = 'auto';
+        audio.crossOrigin = 'anonymous';
         
         // Add event listeners
         audio.addEventListener('ended', () => {
@@ -76,17 +95,27 @@ const MusicStep: React.FC<MusicStepProps> = ({
         audio.addEventListener('error', () => {
           console.error('Audio failed to load:', track.url);
           setPlayingTrack(null);
-        });
-        audio.addEventListener('loadeddata', () => {
-          console.log('Audio loaded successfully:', track.name);
-          audio.play().catch((error) => {
-            console.error('Audio play failed:', error);
-            setPlayingTrack(null);
+          const label = track.name || track.title || 'this audio file';
+          void alertDialog(`Unable to play "${label}". Check the audio file URL or S3 permissions.`, {
+            title: 'Playback Error',
           });
         });
         
         audioRefs[track.id] = audio;
         setPlayingTrack(track.id);
+
+        // Attempt immediate playback from user gesture.
+        audio.play().catch((error) => {
+          console.warn('Immediate audio play failed, retrying after canplay:', error);
+          const retryPlay = () => {
+            audio.play().catch((retryError) => {
+              console.error('Audio play retry failed:', retryError);
+              setPlayingTrack(null);
+            });
+          };
+          audio.addEventListener('canplay', retryPlay, { once: true });
+          audio.load();
+        });
       } else {
         // Play existing audio element
         audioRefs[track.id].play().catch((error) => {
@@ -106,7 +135,9 @@ const MusicStep: React.FC<MusicStepProps> = ({
       setPendingFileName(file.name.replace(/\.[^/.]+$/, '')); // Remove file extension
       setShowRenameDialog(true);
     } else {
-      alert('Please select a valid audio file (MP3, WAV, OGG, etc.)');
+      void alertDialog('Please select a valid audio file (MP3, WAV, OGG, etc.)', {
+        title: 'Invalid Audio File',
+      });
     }
     
     // Reset file input
@@ -140,7 +171,9 @@ const MusicStep: React.FC<MusicStepProps> = ({
     });
     
     audio.addEventListener('error', () => {
-      alert('Failed to load audio file. Please try a different file.');
+      void alertDialog('Failed to load audio file. Please try a different file.', {
+        title: 'Upload Error',
+      });
       URL.revokeObjectURL(url);
       setShowRenameDialog(false);
       setPendingFile(null);
@@ -183,7 +216,9 @@ const MusicStep: React.FC<MusicStepProps> = ({
 
   const handleUrlAdd = () => {
     if (!audioUrl.trim() || !audioName.trim()) {
-      alert('Please enter both a name and URL for the audio');
+      void alertDialog('Please enter both a name and URL for the audio', {
+        title: 'Missing Fields',
+      });
       return;
     }
 
@@ -206,8 +241,48 @@ const MusicStep: React.FC<MusicStepProps> = ({
     });
     
     audio.addEventListener('error', () => {
-      alert('Failed to load audio from URL. Please check the URL and try again.');
+      void alertDialog('Failed to load audio from URL. Please check the URL and try again.', {
+        title: 'URL Error',
+      });
     });
+  };
+
+  const handleRenameExistingMusic = async (music: { id: string; name: string }) => {
+    const newName = await promptDialog('Enter a new name for this audio file:', music.name, {
+      title: 'Rename Audio',
+      confirmText: 'Save',
+      cancelText: 'Cancel',
+      placeholder: 'Audio name',
+    });
+    if (!newName || !newName.trim() || newName.trim() === music.name) return;
+    try {
+      await onRenameExistingMusic?.(music.id, newName.trim());
+      toast('Audio renamed.', 'success');
+    } catch (error) {
+      console.error('Failed to rename audio:', error);
+      await alertDialog('Failed to rename audio file. Please try again.', {
+        title: 'Rename Error',
+      });
+    }
+  };
+
+  const handleDeleteExistingMusic = async (music: { id: string; name: string }) => {
+    const confirmed = await confirmDialog(`Delete "${music.name}" from your audio library?`, {
+      title: 'Delete Audio',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      danger: true,
+    });
+    if (!confirmed) return;
+    try {
+      await onDeleteExistingMusic?.(music.id);
+      toast('Audio deleted.', 'success');
+    } catch (error) {
+      console.error('Failed to delete audio:', error);
+      await alertDialog('Failed to delete audio file. Please try again.', {
+        title: 'Delete Error',
+      });
+    }
   };
 
   return (
@@ -231,7 +306,7 @@ const MusicStep: React.FC<MusicStepProps> = ({
               {existingMusicFiles.map((music) => (
                 <div
                   key={music.id}
-                  className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                  className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 overflow-hidden ${
                     selectedTrack?.assetId === music.id
                       ? 'border-teal-500 bg-teal-50 shadow-md'
                       : 'border-gray-200 hover:border-teal-500 bg-white hover:bg-teal-50'
@@ -242,7 +317,7 @@ const MusicStep: React.FC<MusicStepProps> = ({
                   }}
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-3 flex-1 min-w-0">
                       <div className={`p-2 rounded-lg ${
                         selectedTrack?.assetId === music.id
                           ? 'bg-teal-200 text-teal-700'
@@ -251,7 +326,7 @@ const MusicStep: React.FC<MusicStepProps> = ({
                         <Music className="h-5 w-5" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-gray-900 truncate">{music.name}</h3>
+                        <h3 className="font-semibold text-gray-900 truncate block w-full">{music.name}</h3>
                         <div className="flex items-center space-x-2 text-xs text-gray-500 mt-1">
                           <span>{new Date(music.createdTime).toLocaleDateString()}</span>
                           {music.size && (
@@ -263,17 +338,38 @@ const MusicStep: React.FC<MusicStepProps> = ({
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1.5 shrink-0 ml-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleRenameExistingMusic(music);
+                        }}
+                        className="p-2 hover:bg-white rounded-full transition-colors"
+                        title="Rename audio"
+                      >
+                        <Pencil className="h-4 w-4 text-gray-600" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleDeleteExistingMusic(music);
+                        }}
+                        className="p-2 hover:bg-red-50 rounded-full transition-colors"
+                        title="Delete audio"
+                      >
+                        <Trash2 className="h-4 w-4 text-red-600" />
+                      </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           // Create a temporary track for preview
                           const tempTrack: MusicTrack = {
                             id: `preview-${music.id}`,
+                            name: music.name,
                             title: music.name,
                             artist: 'Uploaded Music',
                             url: music.url,
-                            duration: '0:00',
+                            duration: 0,
                             isCustom: true
                           };
                           togglePlay(tempTrack);
@@ -396,7 +492,7 @@ const MusicStep: React.FC<MusicStepProps> = ({
              className="inline-flex items-center px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-medium transition-colors"
             >
               <Plus className="h-4 w-4 mr-1" />
-              Add Audio
+              Add New Audio
             </button>
           </div>
 

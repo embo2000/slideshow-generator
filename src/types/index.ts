@@ -23,7 +23,7 @@ export interface VideoSettings {
 }
 
 export interface BackgroundImage {
-  file: File;
+  file?: File;
   url: string;
   opacity?: number;
   assetId?: string; // Google Drive asset ID
