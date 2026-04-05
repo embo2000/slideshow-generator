@@ -7,6 +7,11 @@ interface PhotoIntakePageProps {
   token: string;
 }
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+}
+
 const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
   const searchParams = useMemo(() => new URLSearchParams(window.location.search), []);
   const sharedPayloadId = searchParams.get("sharedPayload");
@@ -22,6 +27,10 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
   const [success, setSuccess] = useState<string | null>(null);
   const [pwaInstalled, setPwaInstalled] = useState(false);
   const [shareTargetReady, setShareTargetReady] = useState(false);
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<BeforeInstallPromptEvent | null>(
+    null
+  );
+  const [showInstallHelp, setShowInstallHelp] = useState(false);
 
   useEffect(() => {
     localStorage.setItem("default-intake-token", token);
@@ -47,6 +56,27 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
     return () => {
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
+  useEffect(() => {
+    const onBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setDeferredInstallPrompt(event as BeforeInstallPromptEvent);
+    };
+
+    const onAppInstalled = () => {
+      setDeferredInstallPrompt(null);
+      setPwaInstalled(true);
+      setShareTargetReady("serviceWorker" in navigator && "caches" in window);
+    };
+
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    window.addEventListener("appinstalled", onAppInstalled);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", onAppInstalled);
     };
   }, []);
 
@@ -231,6 +261,30 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
             : pwaInstalled
             ? "PWA installed. Finalizing Share Target support — if needed, reopen the app once."
             : "For Android Send To: install this app from Chrome menu -> Install app."}
+          {!pwaInstalled && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (deferredInstallPrompt) {
+                    await deferredInstallPrompt.prompt();
+                    await deferredInstallPrompt.userChoice;
+                  } else {
+                    setShowInstallHelp((prev) => !prev);
+                  }
+                }}
+                className="inline-flex items-center px-3 py-1.5 rounded-md bg-teal-600 hover:bg-teal-700 text-white text-xs font-medium"
+              >
+                {deferredInstallPrompt ? "Install App" : "Show Install Steps"}
+              </button>
+              {showInstallHelp && (
+                <span className="text-xs">
+                  Open Chrome menu (three dots) and tap <strong>Install app</strong> or{" "}
+                  <strong>Add to Home screen</strong>.
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="space-y-3">
