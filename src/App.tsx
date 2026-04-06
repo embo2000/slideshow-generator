@@ -478,6 +478,12 @@ const handleLoadSlideshow = (data: {
                   return new File([blob], `${className}-image-${index + 1}.jpg`, { type: 'image/jpeg' });
                 }
 
+                // Placeholder when S3 upload failed but slideshow row was still saved
+                if (img && typeof img === 'object' && img.pendingUpload && !img.url) {
+                  console.warn('Skipping photo that was not uploaded to storage:', img.name);
+                  return null;
+                }
+
                 // If it's an object with URL from backend storage
                 if (img && typeof img === 'object' && img.url) {
                   // Keep a lightweight file placeholder and always render from backend URL.
