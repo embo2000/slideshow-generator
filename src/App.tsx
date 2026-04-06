@@ -845,8 +845,8 @@ const normalizeLoadedClassData = (loaded: any) => {
 
   const generateVideo = async () => {
     if (getTotalPhotos() === 0) return;
-    // Persist slideshow JSON before recording. Video upload can succeed even when this fails,
-    // which otherwise looks like "video saved but slideshow didn't."
+    // Persist slideshow to the database (POST /api/slideshows) before recording. Video upload
+    // can succeed even when this fails, which otherwise looks like "video saved but slideshow didn't."
     try {
       await handleAutoSave();
     } catch (error) {
