@@ -773,6 +773,7 @@ const normalizeLoadedClassData = (loaded: any) => {
       console.log('Auto-save successful for:', slideshowName);
     } catch (error) {
       console.error('Auto-save failed:', error);
+      throw error;
     }
   };
 
@@ -842,8 +843,26 @@ const normalizeLoadedClassData = (loaded: any) => {
     slideDuration,
   ]);
 
-  const generateVideo = () => {
+  const generateVideo = async () => {
     if (getTotalPhotos() === 0) return;
+    // Persist slideshow JSON before recording. Video upload can succeed even when this fails,
+    // which otherwise looks like "video saved but slideshow didn't."
+    try {
+      await handleAutoSave();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Could not save slideshow to the server.';
+      console.error('Save before video generation failed:', error);
+      toast(
+        'Slideshow was not saved. Fix the issue below, then try Generate again.',
+        'error'
+      );
+      await alertDialog(
+        `The slideshow could not be saved before generating your video. Without this step, it will not appear in your saved slideshows.\n\n${message}`,
+        { title: 'Save failed' }
+      );
+      return;
+    }
     setShowVideoGenerator(true);
   };
 
