@@ -77,7 +77,14 @@ const apiFetch = async <T>(path: string, init?: RequestInit): Promise<T> => {
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || `Request failed with ${response.status}`);
+    let message = `Request failed with ${response.status}`;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed.error) message = parsed.error;
+    } catch {
+      if (text) message = text;
+    }
+    throw new Error(message);
   }
 
   if (response.status === 204) {
@@ -262,7 +269,15 @@ export const backendService = {
       headers: buildHeaders({}, false),
     });
     if (!response.ok) {
-      throw new Error(await response.text());
+      const text = await response.text();
+      let message = "Upload failed";
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed.error) message = parsed.error;
+      } catch {
+        if (text) message = text;
+      }
+      throw new Error(message);
     }
     return response.json() as Promise<{
       slideshowId: string;

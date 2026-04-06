@@ -406,56 +406,67 @@ app.post(`${apiPrefix}/intake/:token/upload`, intakeUpload.array("files", 20), a
     return res.status(400).json({ error: "Selected group does not exist in slideshow" });
   }
 
-  const uploadedItems = [];
-  for (const file of files) {
-    if (!file.mimetype?.startsWith("image/")) {
-      continue;
+  let uploadedItems;
+  try {
+    uploadedItems = [];
+    for (const file of files) {
+      if (!file.mimetype?.startsWith("image/")) {
+        continue;
+      }
+
+      const objectKey = `photo/${Date.now()}-${crypto.randomUUID()}-${normalizeName(file.originalname)}`;
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: process.env.S3_BUCKET,
+          Key: objectKey,
+          Body: file.buffer,
+          ContentType: file.mimetype,
+        })
+      );
+
+      const asset = await prisma.asset.create({
+        data: {
+          ownerEmail: tokenOwnerEmail,
+          kind: "photo",
+          name: file.originalname,
+          originalFileName: file.originalname,
+          mimeType: file.mimetype || "application/octet-stream",
+          size: file.size,
+          s3Key: objectKey,
+        },
+      });
+
+      uploadedItems.push({
+        id: asset.id,
+        name: asset.name,
+        url: await buildAssetUrl(asset.s3Key),
+      });
     }
-
-    const objectKey = `photo/${Date.now()}-${crypto.randomUUID()}-${normalizeName(file.originalname)}`;
-    await s3.send(
-      new PutObjectCommand({
-        Bucket: process.env.S3_BUCKET,
-        Key: objectKey,
-        Body: file.buffer,
-        ContentType: file.mimetype,
-      })
-    );
-
-    const asset = await prisma.asset.create({
-      data: {
-        ownerEmail: tokenOwnerEmail,
-        kind: "photo",
-        name: file.originalname,
-        originalFileName: file.originalname,
-        mimeType: file.mimetype || "application/octet-stream",
-        size: file.size,
-        s3Key: objectKey,
-      },
-    });
-
-    uploadedItems.push({
-      id: asset.id,
-      name: asset.name,
-      url: await buildAssetUrl(asset.s3Key),
-    });
+  } catch (uploadError) {
+    console.error("Intake photo upload failed:", uploadError);
+    return res.status(500).json({ error: "Photo upload failed. Please try again." });
   }
 
   if (uploadedItems.length === 0) {
     return res.status(400).json({ error: "No valid image files found" });
   }
 
-  const classData = slideshow.classData && typeof slideshow.classData === "object"
-    ? { ...slideshow.classData }
-    : {};
-  const groupItems = Array.isArray(classData[groupName]) ? [...classData[groupName]] : [];
-  groupItems.push(...uploadedItems);
-  classData[groupName] = groupItems;
+  try {
+    const classData = slideshow.classData && typeof slideshow.classData === "object"
+      ? { ...slideshow.classData }
+      : {};
+    const groupItems = Array.isArray(classData[groupName]) ? [...classData[groupName]] : [];
+    groupItems.push(...uploadedItems);
+    classData[groupName] = groupItems;
 
-  await prisma.slideshow.update({
-    where: { id: slideshow.id },
-    data: { classData },
-  });
+    await prisma.slideshow.update({
+      where: { id: slideshow.id },
+      data: { classData },
+    });
+  } catch (dbError) {
+    console.error("Failed to update slideshow after intake upload:", dbError);
+    return res.status(500).json({ error: "Photos were uploaded but failed to attach to slideshow. Please try again." });
+  }
 
   res.status(201).json({
     slideshowId: slideshow.id,
@@ -890,6 +901,18 @@ app.delete(`${apiPrefix}/slideshows/:id`, async (req, res) => {
 
   await prisma.slideshow.delete({ where: { id: req.params.id } });
   res.status(204).send();
+});
+
+app.use((err, _req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    const messages = {
+      LIMIT_FILE_SIZE: "File is too large. Maximum size is 25 MB per photo.",
+      LIMIT_FILE_COUNT: "Too many files. Maximum is 20 photos at once.",
+      LIMIT_UNEXPECTED_FILE: "Unexpected file field in upload.",
+    };
+    return res.status(400).json({ error: messages[err.code] || `Upload error: ${err.message}` });
+  }
+  next(err);
 });
 
 app.use(express.static(distDir));
