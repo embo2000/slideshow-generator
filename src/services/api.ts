@@ -87,6 +87,24 @@ const apiFetch = async <T>(path: string, init?: RequestInit): Promise<T> => {
   return response.json() as Promise<T>;
 };
 
+const formatUploadErrorBody = (text: string): string => {
+  try {
+    const parsed = JSON.parse(text) as {
+      error?: string;
+      message?: string;
+      phase?: string;
+    };
+    const bits: string[] = [];
+    if (parsed.error) bits.push(parsed.error);
+    if (parsed.phase) bits.push(`[${parsed.phase}]`);
+    if (parsed.message) bits.push(parsed.message);
+    if (bits.length > 0) return bits.join(" ");
+  } catch {
+    // not JSON
+  }
+  return text;
+};
+
 const uploadAsset = async (
   file: File,
   kind: "image" | "audio" | "photo" | "video",
@@ -104,7 +122,8 @@ const uploadAsset = async (
   });
 
   if (!response.ok) {
-    throw new Error(await response.text());
+    const text = await response.text();
+    throw new Error(formatUploadErrorBody(text) || `Request failed with ${response.status}`);
   }
 
   return response.json() as Promise<StoredFile>;

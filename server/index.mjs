@@ -486,31 +486,62 @@ app.post(`${apiPrefix}/assets/upload`, upload.single("file"), async (req, res) =
       req.file.originalname
     )}`;
 
-    await s3.send(
-      new PutObjectCommand({
-        Bucket: process.env.S3_BUCKET,
-        Key: objectKey,
-        Body: req.file.buffer,
-        ContentType: req.file.mimetype,
-      })
-    );
+    try {
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: process.env.S3_BUCKET,
+          Key: objectKey,
+          Body: req.file.buffer,
+          ContentType: req.file.mimetype,
+        })
+      );
+    } catch (error) {
+      console.error("S3 upload failed:", error);
+      const hint =
+        !process.env.S3_BUCKET || !process.env.S3_REGION
+          ? "Server is missing S3_BUCKET or S3_REGION."
+          : /credential|Credential|AccessDenied|InvalidAccessKeyId|SignatureDoesNotMatch/i.test(
+                String(error?.message || error?.name || "")
+              )
+            ? "Check S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, bucket policy, and region."
+            : String(error?.message || error).slice(0, 400);
+      return res.status(500).json({
+        error: "Failed to upload asset",
+        phase: "storage",
+        message: hint,
+      });
+    }
 
-    const asset = await prisma.asset.create({
-      data: {
-        ownerEmail: ownerEmail || null,
-        kind,
-        name: displayName,
-        originalFileName: req.file.originalname,
-        mimeType: req.file.mimetype || "application/octet-stream",
-        size: req.file.size,
-        s3Key: objectKey,
-      },
-    });
+    let asset;
+    try {
+      asset = await prisma.asset.create({
+        data: {
+          ownerEmail: ownerEmail || null,
+          kind,
+          name: displayName,
+          originalFileName: req.file.originalname,
+          mimeType: req.file.mimetype || "application/octet-stream",
+          size: req.file.size,
+          s3Key: objectKey,
+        },
+      });
+    } catch (error) {
+      console.error("Asset DB record failed after S3 upload:", error);
+      // Orphan object may remain in S3; ops can reconcile by key prefix if needed.
+      return res.status(500).json({
+        error: "Failed to upload asset",
+        phase: "database",
+        message: String(error?.message || error).slice(0, 400),
+      });
+    }
 
     res.json(await mapAssetForClient(asset));
   } catch (error) {
     console.error("Asset upload failed:", error);
-    res.status(500).json({ error: "Failed to upload asset" });
+    res.status(500).json({
+      error: "Failed to upload asset",
+      message: String(error?.message || error).slice(0, 400),
+    });
   }
 });
 
