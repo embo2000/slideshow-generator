@@ -6,10 +6,12 @@ import ShareTargetPage from './components/ShareTargetPage.tsx';
 import TermsPage from './components/TermsPage.tsx';
 import PrivacyPolicyPage from './components/PrivacyPolicyPage.tsx';
 import { DialogProvider } from './components/ui/DialogProvider.tsx';
+import { initPwaInstallPromptCapture } from './utils/pwaInstallPrompt.ts';
 import { registerSW } from 'virtual:pwa-register';
 import './index.css';
 
 registerSW({ immediate: true });
+initPwaInstallPromptCapture();
 
 const path = window.location.pathname;
 const intakeMatch = path.match(/^\/intake\/([^/]+)$/);
