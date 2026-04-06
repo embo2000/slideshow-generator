@@ -94,6 +94,8 @@ function App() {
   const [customMusicTracks, setCustomMusicTracks] = useState<MusicTrack[]>([]);
   const stepAutoSaveInProgressRef = useRef(false);
   const stepAutoSaveQueuedRef = useRef(false);
+  const contentAutoSaveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const triggerStepAutoSaveRef = useRef<(() => void) | null>(null);
   const uploadedPhotoAssetsRef = useRef<WeakMap<File, StoredFile>>(new WeakMap());
   const uploadingPhotoAssetsRef = useRef<WeakMap<File, Promise<StoredFile>>>(new WeakMap());
   const uploadingMusicTrackIdsRef = useRef<Set<string>>(new Set());
@@ -771,6 +773,7 @@ const normalizeLoadedClassData = (loaded: any) => {
       console.log('Auto-save successful for:', slideshowName);
     } catch (error) {
       console.error('Auto-save failed:', error);
+      throw error;
     }
   };
 
@@ -800,8 +803,66 @@ const normalizeLoadedClassData = (loaded: any) => {
     });
   };
 
-  const generateVideo = () => {
+  triggerStepAutoSaveRef.current = triggerStepAutoSave;
+
+  // Persist when photos/music/background/settings change — not only on step navigation.
+  // Without this, users who add images but never tap Next see nothing saved to the server.
+  useEffect(() => {
+    if (!currentUser) return;
+    if (!slideshowName.trim()) return;
+    const photoCount = Object.values(classData).reduce(
+      (total, photos) => total + (photos && Array.isArray(photos) ? photos.length : 0),
+      0
+    );
+    if (photoCount === 0 && selectedMusic === null && backgroundOption.type === 'none') {
+      return;
+    }
+
+    if (contentAutoSaveDebounceRef.current) {
+      clearTimeout(contentAutoSaveDebounceRef.current);
+    }
+    contentAutoSaveDebounceRef.current = setTimeout(() => {
+      contentAutoSaveDebounceRef.current = null;
+      triggerStepAutoSaveRef.current?.();
+    }, 900);
+
+    return () => {
+      if (contentAutoSaveDebounceRef.current) {
+        clearTimeout(contentAutoSaveDebounceRef.current);
+        contentAutoSaveDebounceRef.current = null;
+      }
+    };
+  }, [
+    currentUser,
+    slideshowName,
+    classData,
+    selectedMusic,
+    backgroundOption,
+    selectedTransition,
+    classes,
+    slideDuration,
+  ]);
+
+  const generateVideo = async () => {
     if (getTotalPhotos() === 0) return;
+    // Persist slideshow to the database (POST /api/slideshows) before recording. Video upload
+    // can succeed even when this fails, which otherwise looks like "video saved but slideshow didn't."
+    try {
+      await handleAutoSave();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Could not save slideshow to the server.';
+      console.error('Save before video generation failed:', error);
+      toast(
+        'Slideshow was not saved. Fix the issue below, then try Generate again.',
+        'error'
+      );
+      await alertDialog(
+        `The slideshow could not be saved before generating your video. Without this step, it will not appear in your saved slideshows.\n\n${message}`,
+        { title: 'Save failed' }
+      );
+      return;
+    }
     setShowVideoGenerator(true);
   };
 
