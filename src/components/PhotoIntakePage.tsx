@@ -230,7 +230,8 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
         }
       }
     } catch (e) {
-      setError("Upload failed. Please verify slideshow/group selection and try again.");
+      const message = e instanceof Error ? e.message : "Upload failed";
+      setError(message);
     } finally {
       setIsSubmitting(false);
     }
