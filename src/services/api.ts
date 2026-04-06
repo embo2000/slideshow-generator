@@ -102,7 +102,8 @@ const apiFetch = async <T>(path: string, init?: RequestInit): Promise<T> => {
   return response.json() as Promise<T>;
 };
 
-const formatUploadErrorBody = (text: string): string => {
+/** Format JSON API error bodies (upload routes return error + optional phase + message). */
+const formatApiErrorBody = (text: string): string => {
   try {
     const parsed = JSON.parse(text) as {
       error?: string;
@@ -138,7 +139,7 @@ const uploadAsset = async (
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(formatUploadErrorBody(text) || `Request failed with ${response.status}`);
+    throw new Error(formatApiErrorBody(text) || `Request failed with ${response.status}`);
   }
 
   return response.json() as Promise<StoredFile>;
@@ -338,14 +339,7 @@ export const backendService = {
     });
     if (!response.ok) {
       const text = await response.text();
-      let message = "Upload failed";
-      try {
-        const parsed = JSON.parse(text);
-        if (parsed.error) message = parsed.error;
-      } catch {
-        if (text) message = text;
-      }
-      throw new Error(message);
+      throw new Error(formatApiErrorBody(text) || `Upload failed (${response.status})`);
     }
     return response.json() as Promise<{
       slideshowId: string;

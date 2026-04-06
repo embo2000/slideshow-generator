@@ -59,6 +59,24 @@ const s3 = new S3Client({
   },
 });
 
+/** Human-readable hint for S3 PutObject failures (shared by /assets/upload and intake upload). */
+const buildS3StorageHint = (error) => {
+  const errText = String(error?.message || error?.code || error);
+  if (!process.env.S3_BUCKET || !process.env.S3_REGION) {
+    return "Server is missing S3_BUCKET or S3_REGION.";
+  }
+  if (/ENOTFOUND|getaddrinfo/i.test(errText) && customS3Endpoint && !forcePathStyle) {
+    return "DNS failed for virtual-hosted S3 URL. Set S3_FORCE_PATH_STYLE=true or redeploy (custom endpoints default to path-style).";
+  }
+  if (/ENOTFOUND|getaddrinfo/i.test(errText)) {
+    return "DNS failed for S3 host. Check S3_ENDPOINT and network; path-style may be required.";
+  }
+  if (/credential|Credential|AccessDenied|InvalidAccessKeyId|SignatureDoesNotMatch/i.test(errText)) {
+    return "Check S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, bucket policy, and region.";
+  }
+  return errText.slice(0, 400);
+};
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 250 * 1024 * 1024 },
@@ -424,15 +442,15 @@ app.post(`${apiPrefix}/intake/:token/upload`, intakeUpload.array("files", 20), a
     return res.status(400).json({ error: "Selected group does not exist in slideshow" });
   }
 
-  let uploadedItems;
-  try {
-    uploadedItems = [];
-    for (const file of files) {
-      if (!file.mimetype?.startsWith("image/")) {
-        continue;
-      }
+  const uploadedItems = [];
+  for (const file of files) {
+    if (!file.mimetype?.startsWith("image/")) {
+      continue;
+    }
 
-      const objectKey = `photo/${Date.now()}-${crypto.randomUUID()}-${normalizeName(file.originalname)}`;
+    const objectKey = `photo/${Date.now()}-${crypto.randomUUID()}-${normalizeName(file.originalname)}`;
+
+    try {
       await s3.send(
         new PutObjectCommand({
           Bucket: process.env.S3_BUCKET,
@@ -441,8 +459,18 @@ app.post(`${apiPrefix}/intake/:token/upload`, intakeUpload.array("files", 20), a
           ContentType: file.mimetype,
         })
       );
+    } catch (s3Err) {
+      console.error("Intake S3 upload failed:", s3Err);
+      return res.status(500).json({
+        error: "Photo upload failed",
+        phase: "storage",
+        message: buildS3StorageHint(s3Err),
+      });
+    }
 
-      const asset = await prisma.asset.create({
+    let asset;
+    try {
+      asset = await prisma.asset.create({
         data: {
           ownerEmail: tokenOwnerEmail,
           kind: "photo",
@@ -453,16 +481,20 @@ app.post(`${apiPrefix}/intake/:token/upload`, intakeUpload.array("files", 20), a
           s3Key: objectKey,
         },
       });
-
-      uploadedItems.push({
-        id: asset.id,
-        name: asset.name,
-        url: await buildAssetUrl(asset.s3Key),
+    } catch (dbErr) {
+      console.error("Intake asset DB create failed after S3 upload:", dbErr);
+      return res.status(500).json({
+        error: "Photo upload failed",
+        phase: "database",
+        message: String(dbErr?.message || dbErr).slice(0, 400),
       });
     }
-  } catch (uploadError) {
-    console.error("Intake photo upload failed:", uploadError);
-    return res.status(500).json({ error: "Photo upload failed. Please try again." });
+
+    uploadedItems.push({
+      id: asset.id,
+      name: asset.name,
+      url: await buildAssetUrl(asset.s3Key),
+    });
   }
 
   if (uploadedItems.length === 0) {
@@ -526,23 +558,10 @@ app.post(`${apiPrefix}/assets/upload`, upload.single("file"), async (req, res) =
       );
     } catch (error) {
       console.error("S3 upload failed:", error);
-      const errText = String(error?.message || error?.code || error);
-      const hint =
-        !process.env.S3_BUCKET || !process.env.S3_REGION
-          ? "Server is missing S3_BUCKET or S3_REGION."
-          : /ENOTFOUND|getaddrinfo/i.test(errText) && customS3Endpoint && !forcePathStyle
-            ? "DNS failed for virtual-hosted S3 URL. Set S3_FORCE_PATH_STYLE=true or upgrade server (custom endpoints default to path-style)."
-            : /ENOTFOUND|getaddrinfo/i.test(errText)
-              ? "DNS failed for S3 host. Check S3_ENDPOINT and network; path-style may be required."
-          : /credential|Credential|AccessDenied|InvalidAccessKeyId|SignatureDoesNotMatch/i.test(
-                errText
-              )
-            ? "Check S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, bucket policy, and region."
-            : errText.slice(0, 400);
       return res.status(500).json({
         error: "Failed to upload asset",
         phase: "storage",
-        message: hint,
+        message: buildS3StorageHint(error),
       });
     }
 
