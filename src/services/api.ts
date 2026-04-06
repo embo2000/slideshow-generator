@@ -29,9 +29,17 @@ export interface IntakeBootstrap {
   }>;
 }
 
+/** Serialized photo refs for API; `pendingUpload` when S3 upload failed but we still persist the slideshow row. */
+export type SerializedClassPhoto = {
+  id: string;
+  name: string;
+  url: string;
+  pendingUpload?: boolean;
+};
+
 export interface SlideshowPayload {
   name: string;
-  classData: Record<string, Array<{ id: string; name: string; url: string }>>;
+  classData: Record<string, SerializedClassPhoto[]>;
   selectedMusic: MusicTrack | null;
   backgroundOption: BackgroundOption;
   selectedTransition: TransitionType;
@@ -94,6 +102,24 @@ const apiFetch = async <T>(path: string, init?: RequestInit): Promise<T> => {
   return response.json() as Promise<T>;
 };
 
+const formatUploadErrorBody = (text: string): string => {
+  try {
+    const parsed = JSON.parse(text) as {
+      error?: string;
+      message?: string;
+      phase?: string;
+    };
+    const bits: string[] = [];
+    if (parsed.error) bits.push(parsed.error);
+    if (parsed.phase) bits.push(`[${parsed.phase}]`);
+    if (parsed.message) bits.push(parsed.message);
+    if (bits.length > 0) return bits.join(" ");
+  } catch {
+    // not JSON
+  }
+  return text;
+};
+
 const uploadAsset = async (
   file: File,
   kind: "image" | "audio" | "photo" | "video",
@@ -111,7 +137,8 @@ const uploadAsset = async (
   });
 
   if (!response.ok) {
-    throw new Error(await response.text());
+    const text = await response.text();
+    throw new Error(formatUploadErrorBody(text) || `Request failed with ${response.status}`);
   }
 
   return response.json() as Promise<StoredFile>;
@@ -120,22 +147,43 @@ const uploadAsset = async (
 const serializeClassData = async (
   classData: ClassData,
   uploadedPhotoAssets?: WeakMap<File, StoredFile>
-) => {
-  const result: Record<string, Array<{ id: string; name: string; url: string }>> = {};
+): Promise<Record<string, SerializedClassPhoto[]>> => {
+  const result: Record<string, SerializedClassPhoto[]> = {};
 
   for (const [className, files] of Object.entries(classData)) {
     result[className] = [];
     for (const file of files) {
       const uploadedFromCache = uploadedPhotoAssets?.get(file);
-      const uploaded = uploadedFromCache ?? (await uploadAsset(file, "photo", file.name));
-      if (!uploadedFromCache && uploadedPhotoAssets) {
-        uploadedPhotoAssets.set(file, uploaded);
+      if (uploadedFromCache) {
+        result[className].push({
+          id: uploadedFromCache.id,
+          name: uploadedFromCache.name,
+          url: uploadedFromCache.url,
+        });
+        continue;
       }
-      result[className].push({
-        id: uploaded.id,
-        name: uploaded.name,
-        url: uploaded.url,
-      });
+      try {
+        const uploaded = await uploadAsset(file, "photo", file.name);
+        if (uploadedPhotoAssets) {
+          uploadedPhotoAssets.set(file, uploaded);
+        }
+        result[className].push({
+          id: uploaded.id,
+          name: uploaded.name,
+          url: uploaded.url,
+        });
+      } catch (error) {
+        console.warn(
+          `Photo upload failed for "${file.name}"; saving slideshow metadata without this asset.`,
+          error
+        );
+        result[className].push({
+          id: "",
+          name: file.name,
+          url: "",
+          pendingUpload: true,
+        });
+      }
     }
   }
 
@@ -160,17 +208,24 @@ const saveSlideshow = async (params: {
 
   let selectedMusic = params.selectedMusic;
   if (params.selectedMusic?.file && !params.selectedMusic.assetId) {
-    const uploadedMusic = await uploadAsset(
-      params.selectedMusic.file,
-      "audio",
-      params.selectedMusic.name
-    );
-    selectedMusic = {
-      ...params.selectedMusic,
-      assetId: uploadedMusic.id,
-      url: uploadedMusic.url,
-      file: undefined,
-    };
+    try {
+      const uploadedMusic = await uploadAsset(
+        params.selectedMusic.file,
+        "audio",
+        params.selectedMusic.name
+      );
+      selectedMusic = {
+        ...params.selectedMusic,
+        assetId: uploadedMusic.id,
+        url: uploadedMusic.url,
+        file: undefined,
+      };
+    } catch (error) {
+      console.warn("Music file upload failed; saving slideshow without that audio asset.", error);
+      selectedMusic = params.selectedMusic.url
+        ? { ...params.selectedMusic, file: undefined }
+        : null;
+    }
   }
 
   let backgroundOption = params.backgroundOption;
@@ -179,20 +234,33 @@ const saveSlideshow = async (params: {
     params.backgroundOption.image?.file &&
     !params.backgroundOption.image.assetId
   ) {
-    const uploadedBackground = await uploadAsset(
-      params.backgroundOption.image.file,
-      "image",
-      params.backgroundOption.image.file.name
-    );
-    backgroundOption = {
-      ...params.backgroundOption,
-      image: {
-        ...params.backgroundOption.image,
-        assetId: uploadedBackground.id,
-        url: uploadedBackground.url,
-        file: undefined,
-      },
-    };
+    try {
+      const uploadedBackground = await uploadAsset(
+        params.backgroundOption.image.file,
+        "image",
+        params.backgroundOption.image.file.name
+      );
+      backgroundOption = {
+        ...params.backgroundOption,
+        image: {
+          ...params.backgroundOption.image,
+          assetId: uploadedBackground.id,
+          url: uploadedBackground.url,
+          file: undefined,
+        },
+      };
+    } catch (error) {
+      console.warn("Background image upload failed; saving slideshow without that image asset.", error);
+      backgroundOption = params.backgroundOption.image?.url
+        ? {
+            ...params.backgroundOption,
+            image: {
+              ...params.backgroundOption.image,
+              file: undefined,
+            },
+          }
+        : { type: "none" };
+    }
   }
 
   return apiFetch<StoredSlideshow>("/slideshows", {

@@ -31,10 +31,28 @@ if (missing.length > 0) {
   console.warn(`Missing required environment variables: ${missing.join(", ")}`);
 }
 
+// Custom S3-compatible endpoints (MinIO, self-hosted gateways) usually do not have DNS for
+// virtual-hosted-style URLs ({bucket}.{endpoint}). Default to path-style for those.
+const customS3Endpoint = process.env.S3_ENDPOINT?.trim();
+let forcePathStyle = false;
+if (process.env.S3_FORCE_PATH_STYLE === "true") {
+  forcePathStyle = true;
+} else if (process.env.S3_FORCE_PATH_STYLE === "false") {
+  forcePathStyle = false;
+} else if (customS3Endpoint) {
+  forcePathStyle = true;
+}
+
+if (customS3Endpoint && forcePathStyle) {
+  console.log(
+    "S3: using path-style URLs for custom endpoint (avoids ENOTFOUND on bucket.endpoint hostnames)."
+  );
+}
+
 const s3 = new S3Client({
   region: process.env.S3_REGION,
-  endpoint: process.env.S3_ENDPOINT || undefined,
-  forcePathStyle: process.env.S3_FORCE_PATH_STYLE === "true",
+  endpoint: customS3Endpoint || undefined,
+  forcePathStyle,
   credentials: {
     accessKeyId: process.env.S3_ACCESS_KEY_ID || "",
     secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || "",
@@ -497,31 +515,67 @@ app.post(`${apiPrefix}/assets/upload`, upload.single("file"), async (req, res) =
       req.file.originalname
     )}`;
 
-    await s3.send(
-      new PutObjectCommand({
-        Bucket: process.env.S3_BUCKET,
-        Key: objectKey,
-        Body: req.file.buffer,
-        ContentType: req.file.mimetype,
-      })
-    );
+    try {
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: process.env.S3_BUCKET,
+          Key: objectKey,
+          Body: req.file.buffer,
+          ContentType: req.file.mimetype,
+        })
+      );
+    } catch (error) {
+      console.error("S3 upload failed:", error);
+      const errText = String(error?.message || error?.code || error);
+      const hint =
+        !process.env.S3_BUCKET || !process.env.S3_REGION
+          ? "Server is missing S3_BUCKET or S3_REGION."
+          : /ENOTFOUND|getaddrinfo/i.test(errText) && customS3Endpoint && !forcePathStyle
+            ? "DNS failed for virtual-hosted S3 URL. Set S3_FORCE_PATH_STYLE=true or upgrade server (custom endpoints default to path-style)."
+            : /ENOTFOUND|getaddrinfo/i.test(errText)
+              ? "DNS failed for S3 host. Check S3_ENDPOINT and network; path-style may be required."
+          : /credential|Credential|AccessDenied|InvalidAccessKeyId|SignatureDoesNotMatch/i.test(
+                errText
+              )
+            ? "Check S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, bucket policy, and region."
+            : errText.slice(0, 400);
+      return res.status(500).json({
+        error: "Failed to upload asset",
+        phase: "storage",
+        message: hint,
+      });
+    }
 
-    const asset = await prisma.asset.create({
-      data: {
-        ownerEmail: ownerEmail || null,
-        kind,
-        name: displayName,
-        originalFileName: req.file.originalname,
-        mimeType: req.file.mimetype || "application/octet-stream",
-        size: req.file.size,
-        s3Key: objectKey,
-      },
-    });
+    let asset;
+    try {
+      asset = await prisma.asset.create({
+        data: {
+          ownerEmail: ownerEmail || null,
+          kind,
+          name: displayName,
+          originalFileName: req.file.originalname,
+          mimeType: req.file.mimetype || "application/octet-stream",
+          size: req.file.size,
+          s3Key: objectKey,
+        },
+      });
+    } catch (error) {
+      console.error("Asset DB record failed after S3 upload:", error);
+      // Orphan object may remain in S3; ops can reconcile by key prefix if needed.
+      return res.status(500).json({
+        error: "Failed to upload asset",
+        phase: "database",
+        message: String(error?.message || error).slice(0, 400),
+      });
+    }
 
     res.json(await mapAssetForClient(asset));
   } catch (error) {
     console.error("Asset upload failed:", error);
-    res.status(500).json({ error: "Failed to upload asset" });
+    res.status(500).json({
+      error: "Failed to upload asset",
+      message: String(error?.message || error).slice(0, 400),
+    });
   }
 });
 
