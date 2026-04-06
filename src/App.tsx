@@ -94,6 +94,8 @@ function App() {
   const [customMusicTracks, setCustomMusicTracks] = useState<MusicTrack[]>([]);
   const stepAutoSaveInProgressRef = useRef(false);
   const stepAutoSaveQueuedRef = useRef(false);
+  const contentAutoSaveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const triggerStepAutoSaveRef = useRef<(() => void) | null>(null);
   const uploadedPhotoAssetsRef = useRef<WeakMap<File, StoredFile>>(new WeakMap());
   const uploadingPhotoAssetsRef = useRef<WeakMap<File, Promise<StoredFile>>>(new WeakMap());
   const uploadingMusicTrackIdsRef = useRef<Set<string>>(new Set());
@@ -799,6 +801,46 @@ const normalizeLoadedClassData = (loaded: any) => {
       stepAutoSaveInProgressRef.current = false;
     });
   };
+
+  triggerStepAutoSaveRef.current = triggerStepAutoSave;
+
+  // Persist when photos/music/background/settings change — not only on step navigation.
+  // Without this, users who add images but never tap Next see nothing saved to the server.
+  useEffect(() => {
+    if (!currentUser) return;
+    if (!slideshowName.trim()) return;
+    const photoCount = Object.values(classData).reduce(
+      (total, photos) => total + (photos && Array.isArray(photos) ? photos.length : 0),
+      0
+    );
+    if (photoCount === 0 && selectedMusic === null && backgroundOption.type === 'none') {
+      return;
+    }
+
+    if (contentAutoSaveDebounceRef.current) {
+      clearTimeout(contentAutoSaveDebounceRef.current);
+    }
+    contentAutoSaveDebounceRef.current = setTimeout(() => {
+      contentAutoSaveDebounceRef.current = null;
+      triggerStepAutoSaveRef.current?.();
+    }, 900);
+
+    return () => {
+      if (contentAutoSaveDebounceRef.current) {
+        clearTimeout(contentAutoSaveDebounceRef.current);
+        contentAutoSaveDebounceRef.current = null;
+      }
+    };
+  }, [
+    currentUser,
+    slideshowName,
+    classData,
+    selectedMusic,
+    backgroundOption,
+    selectedTransition,
+    classes,
+    slideDuration,
+  ]);
 
   const generateVideo = () => {
     if (getTotalPhotos() === 0) return;
