@@ -31,10 +31,28 @@ if (missing.length > 0) {
   console.warn(`Missing required environment variables: ${missing.join(", ")}`);
 }
 
+// Custom S3-compatible endpoints (MinIO, self-hosted gateways) usually do not have DNS for
+// virtual-hosted-style URLs ({bucket}.{endpoint}). Default to path-style for those.
+const customS3Endpoint = process.env.S3_ENDPOINT?.trim();
+let forcePathStyle = false;
+if (process.env.S3_FORCE_PATH_STYLE === "true") {
+  forcePathStyle = true;
+} else if (process.env.S3_FORCE_PATH_STYLE === "false") {
+  forcePathStyle = false;
+} else if (customS3Endpoint) {
+  forcePathStyle = true;
+}
+
+if (customS3Endpoint && forcePathStyle) {
+  console.log(
+    "S3: using path-style URLs for custom endpoint (avoids ENOTFOUND on bucket.endpoint hostnames)."
+  );
+}
+
 const s3 = new S3Client({
   region: process.env.S3_REGION,
-  endpoint: process.env.S3_ENDPOINT || undefined,
-  forcePathStyle: process.env.S3_FORCE_PATH_STYLE === "true",
+  endpoint: customS3Endpoint || undefined,
+  forcePathStyle,
   credentials: {
     accessKeyId: process.env.S3_ACCESS_KEY_ID || "",
     secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || "",
@@ -497,14 +515,19 @@ app.post(`${apiPrefix}/assets/upload`, upload.single("file"), async (req, res) =
       );
     } catch (error) {
       console.error("S3 upload failed:", error);
+      const errText = String(error?.message || error?.code || error);
       const hint =
         !process.env.S3_BUCKET || !process.env.S3_REGION
           ? "Server is missing S3_BUCKET or S3_REGION."
+          : /ENOTFOUND|getaddrinfo/i.test(errText) && customS3Endpoint && !forcePathStyle
+            ? "DNS failed for virtual-hosted S3 URL. Set S3_FORCE_PATH_STYLE=true or upgrade server (custom endpoints default to path-style)."
+            : /ENOTFOUND|getaddrinfo/i.test(errText)
+              ? "DNS failed for S3 host. Check S3_ENDPOINT and network; path-style may be required."
           : /credential|Credential|AccessDenied|InvalidAccessKeyId|SignatureDoesNotMatch/i.test(
-                String(error?.message || error?.name || "")
+                errText
               )
             ? "Check S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, bucket policy, and region."
-            : String(error?.message || error).slice(0, 400);
+            : errText.slice(0, 400);
       return res.status(500).json({
         error: "Failed to upload asset",
         phase: "storage",
