@@ -3,14 +3,15 @@ import { Upload, ImagePlus } from "lucide-react";
 import { backendService, IntakeBootstrap } from "../services/api";
 import { clearSharedPayload, readSharedPayload } from "../utils/shareTargetPayload";
 import { emitUploadSync } from "../utils/slideshowSync";
+import {
+  clearDeferredInstallPrompt,
+  getDeferredInstallPrompt,
+  subscribeDeferredInstallPrompt,
+  type BeforeInstallPromptEvent,
+} from "../utils/pwaInstallPrompt";
 
 interface PhotoIntakePageProps {
   token: string;
-}
-
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 }
 
 const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
@@ -62,24 +63,14 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
   }, []);
 
   useEffect(() => {
-    const onBeforeInstallPrompt = (event: Event) => {
-      event.preventDefault();
-      setDeferredInstallPrompt(event as BeforeInstallPromptEvent);
-    };
-
-    const onAppInstalled = () => {
-      setDeferredInstallPrompt(null);
-      setPwaInstalled(true);
-      setShareTargetReady("serviceWorker" in navigator && "caches" in window);
-    };
-
-    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
-    window.addEventListener("appinstalled", onAppInstalled);
-
-    return () => {
-      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
-      window.removeEventListener("appinstalled", onAppInstalled);
-    };
+    setDeferredInstallPrompt(getDeferredInstallPrompt());
+    const unsubscribe = subscribeDeferredInstallPrompt((prompt) => {
+      setDeferredInstallPrompt(prompt);
+      if (!prompt) {
+        setPwaInstalled((window.navigator as Navigator & { standalone?: boolean }).standalone === true || window.matchMedia("(display-mode: standalone)").matches);
+      }
+    });
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
@@ -287,6 +278,7 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
                   if (deferredInstallPrompt) {
                     await deferredInstallPrompt.prompt();
                     await deferredInstallPrompt.userChoice;
+                    clearDeferredInstallPrompt();
                   } else {
                     setShowInstallHelp((prev) => !prev);
                   }
