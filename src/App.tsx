@@ -1094,7 +1094,6 @@ const normalizeLoadedClassData = (loaded: any) => {
               </button>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">Slideshow Generator</h1>
-                <p className="text-sm text-gray-500">Create beautiful photo slideshows step by step</p>
                 <p className="text-xs text-teal-700 mt-0.5">
                   Working on: <span className="font-semibold">{loadedSlideshowLabel || slideshowName}</span>
                 </p>
@@ -1102,16 +1101,6 @@ const normalizeLoadedClassData = (loaded: any) => {
             </div>
             
             <div className="flex items-center space-x-4">
-              <button
-                onClick={handleNewSlideshow}
-                className="inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors duration-200 shadow-sm"
-                title="Start a new slideshow from scratch"
-              >
-                <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                New Slideshow
-              </button>
               <GoogleAuthButton
                 onAuthChange={setCurrentUser}
                 onShowSettings={() => setShowSettings(true)}
