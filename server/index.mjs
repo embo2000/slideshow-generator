@@ -98,6 +98,8 @@ const normalizeEmail = (value) =>
 const deriveFileNameFromKey = (key = "") => key.split("/").pop() || key;
 const hashToken = (token) => crypto.createHash("sha256").update(token).digest("hex");
 const groupsSettingKey = (ownerEmail) => (ownerEmail ? `groups:${ownerEmail}` : "groups");
+const personalIntakeLinkSettingKey = (ownerEmail) => `personalIntakeLink:${ownerEmail}`;
+const PERSONAL_LINK_EXPIRY_DAYS = 3650;
 
 const getRequestUserEmail = (req) => normalizeEmail(req.headers["x-user-email"]);
 
@@ -113,6 +115,34 @@ const requireUserEmail = (req, res) => {
 const readOwnerEmailFromMetadata = (metadata) => {
   if (!metadata || typeof metadata !== "object") return null;
   return normalizeEmail(metadata.ownerEmail);
+};
+
+const createUploadLinkForOwner = async ({ ownerEmail, expiresInDays = 7, metadata = {} }) => {
+  const safeDays = Number.isFinite(expiresInDays)
+    ? Math.max(1, Math.min(PERSONAL_LINK_EXPIRY_DAYS, expiresInDays))
+    : 7;
+
+  const token = crypto.randomBytes(24).toString("base64url");
+  const tokenHash = hashToken(token);
+  const expiresAt = new Date(Date.now() + safeDays * 24 * 60 * 60 * 1000);
+
+  const link = await prisma.uploadLink.create({
+    data: {
+      tokenHash,
+      expiresAt,
+      active: true,
+      metadata: {
+        ...metadata,
+        ownerEmail,
+      },
+    },
+  });
+
+  return {
+    id: link.id,
+    token,
+    expiresAt: link.expiresAt,
+  };
 };
 
 const buildAssetUrl = async (s3Key) => {
@@ -269,33 +299,142 @@ app.post(`${apiPrefix}/intake-links`, async (req, res) => {
   if (!ownerEmail) return;
 
   const expiresInDays = Number(req.body?.expiresInDays ?? 7);
-  const safeDays = Number.isFinite(expiresInDays)
-    ? Math.max(1, Math.min(30, expiresInDays))
-    : 7;
-
-  const token = crypto.randomBytes(24).toString("base64url");
-  const tokenHash = hashToken(token);
-  const expiresAt = new Date(Date.now() + safeDays * 24 * 60 * 60 * 1000);
-
-  const metadata =
-    req.body?.metadata && typeof req.body.metadata === "object"
-      ? { ...req.body.metadata, ownerEmail }
-      : { ownerEmail };
-
-  const link = await prisma.uploadLink.create({
-    data: {
-      tokenHash,
-      expiresAt,
-      active: true,
-      metadata,
-    },
+  const safeDays = Number.isFinite(expiresInDays) ? Math.max(1, Math.min(30, expiresInDays)) : 7;
+  const metadata = req.body?.metadata && typeof req.body.metadata === "object" ? req.body.metadata : {};
+  const link = await createUploadLinkForOwner({
+    ownerEmail,
+    expiresInDays: safeDays,
+    metadata,
   });
 
   res.status(201).json({
     id: link.id,
-    token,
+    token: link.token,
     expiresAt: link.expiresAt.toISOString(),
   });
+});
+
+app.get(`${apiPrefix}/intake-links/personal`, async (req, res) => {
+  const ownerEmail = requireUserEmail(req, res);
+  if (!ownerEmail) return;
+
+  const settingKey = personalIntakeLinkSettingKey(ownerEmail);
+  const current = await prisma.appSetting.findUnique({
+    where: { key: settingKey },
+  });
+
+  const currentValue = current?.value && typeof current.value === "object" ? current.value : null;
+  const existingToken = typeof currentValue?.token === "string" ? currentValue.token : null;
+  const existingUploadLinkId =
+    typeof currentValue?.uploadLinkId === "string" ? currentValue.uploadLinkId : null;
+
+  if (existingToken && existingUploadLinkId) {
+    const uploadLink = await prisma.uploadLink.findUnique({
+      where: { id: existingUploadLinkId },
+    });
+    const tokenMatches = uploadLink && hashToken(existingToken) === uploadLink.tokenHash;
+    const ownerMatches = uploadLink && readOwnerEmailFromMetadata(uploadLink.metadata) === ownerEmail;
+    if (
+      uploadLink &&
+      tokenMatches &&
+      ownerMatches &&
+      uploadLink.active &&
+      uploadLink.expiresAt > new Date()
+    ) {
+      return res.json({
+        id: uploadLink.id,
+        token: existingToken,
+        expiresAt: uploadLink.expiresAt.toISOString(),
+      });
+    }
+  }
+
+  const created = await createUploadLinkForOwner({
+    ownerEmail,
+    expiresInDays: PERSONAL_LINK_EXPIRY_DAYS,
+    metadata: { linkType: "personal" },
+  });
+
+  await prisma.appSetting.upsert({
+    where: { key: settingKey },
+    update: {
+      value: {
+        uploadLinkId: created.id,
+        token: created.token,
+        active: true,
+        createdAt:
+          typeof currentValue?.createdAt === "string"
+            ? currentValue.createdAt
+            : new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    },
+    create: {
+      key: settingKey,
+      value: {
+        uploadLinkId: created.id,
+        token: created.token,
+        active: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    },
+  });
+
+  return res.json({
+    id: created.id,
+    token: created.token,
+    expiresAt: created.expiresAt.toISOString(),
+  });
+});
+
+app.post(`${apiPrefix}/intake-links/personal/revoke`, async (req, res) => {
+  const ownerEmail = requireUserEmail(req, res);
+  if (!ownerEmail) return;
+
+  const settingKey = personalIntakeLinkSettingKey(ownerEmail);
+  const current = await prisma.appSetting.findUnique({
+    where: { key: settingKey },
+  });
+  const currentValue = current?.value && typeof current.value === "object" ? current.value : null;
+  const existingUploadLinkId =
+    typeof currentValue?.uploadLinkId === "string" ? currentValue.uploadLinkId : null;
+
+  if (existingUploadLinkId) {
+    await prisma.uploadLink.updateMany({
+      where: {
+        id: existingUploadLinkId,
+      },
+      data: {
+        active: false,
+      },
+    });
+  }
+
+  await prisma.appSetting.upsert({
+    where: { key: settingKey },
+    update: {
+      value: {
+        ...(currentValue || {}),
+        token: null,
+        uploadLinkId: null,
+        active: false,
+        updatedAt: new Date().toISOString(),
+      },
+    },
+    create: {
+      key: settingKey,
+      value: {
+        token: null,
+        uploadLinkId: null,
+        active: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    },
+  });
+
+  return res.json({ success: true });
 });
 
 app.get(`${apiPrefix}/intake/:token/bootstrap`, async (req, res) => {

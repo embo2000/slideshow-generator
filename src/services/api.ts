@@ -310,6 +310,13 @@ export const backendService = {
       method: "POST",
       body: JSON.stringify({ expiresInDays, metadata }),
     }),
+  getPersonalIntakeLink: () =>
+    apiFetch<{ id: string; token: string; expiresAt: string }>("/intake-links/personal"),
+  revokePersonalIntakeLink: () =>
+    apiFetch<{ success: boolean }>("/intake-links/personal/revoke", {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
   intakeBootstrap: (token: string) =>
     apiFetch<IntakeBootstrap>(`/intake/${encodeURIComponent(token)}/bootstrap`),
   intakeCreateSlideshow: (token: string, payload: { name: string; classes?: string[] }) =>

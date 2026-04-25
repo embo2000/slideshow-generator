@@ -14,6 +14,15 @@ interface PhotoIntakePageProps {
   token: string;
 }
 
+type SavedDestination = {
+  mode: "existing" | "new";
+  slideshowId: string;
+  groupName: string;
+  updatedAt: string;
+};
+
+const destinationPreferenceKey = (token: string) => `intake-destination:${token}`;
+
 const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
   const searchParams = useMemo(() => new URLSearchParams(window.location.search), []);
   const sharedPayloadId = searchParams.get("sharedPayload");
@@ -38,6 +47,33 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
   useEffect(() => {
     localStorage.setItem("default-intake-token", token);
   }, [token]);
+
+  const saveDestinationPreference = (payload: {
+    mode: "existing" | "new";
+    slideshowId?: string;
+    groupName?: string;
+  }) => {
+    const stored: SavedDestination = {
+      mode: payload.mode,
+      slideshowId: payload.slideshowId || "",
+      groupName: payload.groupName || "",
+      updatedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(destinationPreferenceKey(token), JSON.stringify(stored));
+  };
+
+  const readDestinationPreference = (): SavedDestination | null => {
+    const raw = localStorage.getItem(destinationPreferenceKey(token));
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw) as SavedDestination;
+      if (!parsed || typeof parsed !== "object") return null;
+      if (parsed.mode !== "existing" && parsed.mode !== "new") return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  };
 
   useEffect(() => {
     const evaluatePwaStatus = () => {
@@ -80,6 +116,32 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
       try {
         const data = await backendService.intakeBootstrap(token);
         setBootstrap(data);
+        const saved = readDestinationPreference();
+
+        if (saved?.mode === "existing") {
+          const savedSlideshow = data.slideshows.find((s) => s.id === saved.slideshowId);
+          if (savedSlideshow) {
+            setMode("existing");
+            setExistingSlideshowId(savedSlideshow.id);
+            setSelectedGroup(
+              savedSlideshow.classes.includes(saved.groupName)
+                ? saved.groupName
+                : savedSlideshow.classes[0] || data.defaultClasses[0] || ""
+            );
+            return;
+          }
+        }
+
+        if (saved?.mode === "new") {
+          setMode("new");
+          setSelectedGroup(
+            data.defaultClasses.includes(saved.groupName)
+              ? saved.groupName
+              : data.defaultClasses[0] || ""
+          );
+          return;
+        }
+
         const firstSlideshow = data.slideshows[0];
         if (firstSlideshow) {
           setExistingSlideshowId(firstSlideshow.id);
@@ -154,6 +216,24 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
     }
   }, [availableGroups, selectedGroup]);
 
+  useEffect(() => {
+    if (!bootstrap) return;
+    if (mode === "existing" && existingSlideshowId) {
+      saveDestinationPreference({
+        mode,
+        slideshowId: existingSlideshowId,
+        groupName: selectedGroup,
+      });
+      return;
+    }
+    if (mode === "new") {
+      saveDestinationPreference({
+        mode,
+        groupName: selectedGroup,
+      });
+    }
+  }, [bootstrap, mode, existingSlideshowId, selectedGroup]);
+
   const onFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(event.target.files || []).filter((f) => f.type.startsWith("image/"));
     setFiles(picked);
@@ -204,6 +284,11 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
         files,
       });
       emitUploadSync({ slideshowId, slideshowName: slideshowLabel });
+      saveDestinationPreference({
+        mode: "existing",
+        slideshowId,
+        groupName: selectedGroup,
+      });
 
       setSuccess(
         `Uploaded ${result.uploadedCount} photo${result.uploadedCount === 1 ? "" : "s"} to "${slideshowLabel}" → "${selectedGroup}".`
@@ -218,6 +303,11 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
           setMode("existing");
           setExistingSlideshowId(createdItem.id);
           setSelectedGroup(createdItem.classes[0] || selectedGroup);
+          saveDestinationPreference({
+            mode: "existing",
+            slideshowId: createdItem.id,
+            groupName: createdItem.classes[0] || selectedGroup,
+          });
         }
       }
     } catch (e) {

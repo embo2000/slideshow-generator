@@ -18,6 +18,9 @@ A step-by-step slideshow generator with a production-ready backend for:
 - **Optional Google login UI** for account sign-in
 - **PWA install support** (Android home-screen app)
 - **Android Share Target** for sending photos directly into intake uploads
+- **Persistent personal upload link** per signed-in user
+- **Remembered intake destination** (last slideshow/group selection)
+- **Live upload sync** from intake page to main app
 - **High-quality video export** (1080p)
 
 ## Architecture
@@ -87,13 +90,16 @@ This repo includes a `Dockerfile` ready for Coolify:
 
 ## Android "Send To" Flow (PWA)
 
-1. Open an upload link once (for example `/intake/<token>`) in Chrome on Android.
+1. Sign in and use **Create Upload Link** once to get your personal stable intake URL.
 2. Use Chrome menu -> **Install app** to install Slideshow Generator.
 3. Share photos from Gallery/Messages -> choose **Slideshow Generator**.
-4. The app will route shared files into the last upload link you opened.
+4. The app routes shared files into your saved personal upload link.
+5. Intake remembers your last destination (existing slideshow + group) to reduce taps.
 
 Notes:
 - The first time, if no upload link is saved yet, the app asks for an upload link/token.
+- You can still switch slideshow/group at any time on the intake page.
+- The main app auto-refreshes when intake uploads target the currently loaded slideshow.
 - Share Target currently accepts image files (`image/*`).
 
 ## Technologies Used

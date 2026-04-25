@@ -372,15 +372,15 @@ const getTotalPhotos = () => {
 
   const handleCreateUploadLink = async () => {
     try {
-      const created = await backendService.createIntakeLink(7);
+      const created = await backendService.getPersonalIntakeLink();
       const intakeUrl = `${window.location.origin}/intake/${created.token}`;
 
       try {
         await navigator.clipboard.writeText(intakeUrl);
-        toast('Upload link created and copied to clipboard.', 'success');
+        toast('Personal upload link copied to clipboard.', 'success');
       } catch {
         await promptDialog('Copy this upload link:', intakeUrl, {
-          title: 'Upload Link',
+          title: 'Personal Upload Link',
           confirmText: 'Done',
           cancelText: 'Close',
         });
