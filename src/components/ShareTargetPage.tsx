@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { UploadCloud } from "lucide-react";
+import { backendService } from "../services/api";
 
 const DEFAULT_UPLOAD_LINK_KEY = "default-intake-token";
 
@@ -27,6 +28,8 @@ const ShareTargetPage: React.FC = () => {
 
   const [uploadLinkInput, setUploadLinkInput] = useState("");
   const [inputError, setInputError] = useState<string | null>(null);
+  const [isResolvingPersonalLink, setIsResolvingPersonalLink] = useState(false);
+  const [autoResolveError, setAutoResolveError] = useState<string | null>(null);
 
   const continueToIntake = (token: string) => {
     const cleanToken = token.trim();
@@ -48,6 +51,37 @@ const ShareTargetPage: React.FC = () => {
       window.location.assign(nextUrl);
     }
   }, [savedToken, payloadId]);
+
+  useEffect(() => {
+    if (!payloadId || savedToken) return;
+
+    const currentUserRaw = localStorage.getItem("google_user");
+    if (!currentUserRaw) return;
+
+    try {
+      const parsed = JSON.parse(currentUserRaw) as { email?: string };
+      const email = parsed?.email?.trim().toLowerCase();
+      if (!email) return;
+
+      setIsResolvingPersonalLink(true);
+      setAutoResolveError(null);
+      backendService.setCurrentUserEmail(email);
+      backendService
+        .getPersonalIntakeLink()
+        .then((link) => {
+          continueToIntake(link.token);
+        })
+        .catch((error) => {
+          console.error("Failed to auto-resolve personal upload link:", error);
+          setAutoResolveError("Could not auto-select your personal upload link. Paste a link below.");
+        })
+        .finally(() => {
+          setIsResolvingPersonalLink(false);
+        });
+    } catch {
+      // Ignore malformed local user data and allow manual link input.
+    }
+  }, [payloadId, savedToken]);
 
   if (savedToken && payloadId) {
     return null;
@@ -77,6 +111,18 @@ const ShareTargetPage: React.FC = () => {
         {!payloadId && (
           <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
             Shared payload was not found. Please try sharing the photos again.
+          </div>
+        )}
+
+        {isResolvingPersonalLink && (
+          <div className="text-sm text-teal-700 bg-teal-50 border border-teal-200 rounded-lg p-3">
+            Preparing your personal upload link...
+          </div>
+        )}
+
+        {autoResolveError && (
+          <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
+            {autoResolveError}
           </div>
         )}
 

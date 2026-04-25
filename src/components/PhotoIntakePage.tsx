@@ -318,6 +318,37 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
     }
   };
 
+  const saveDestinationForLater = () => {
+    if (!bootstrap) return;
+
+    if (mode === "existing") {
+      if (!existingSlideshowId) {
+        setError("Please select a slideshow first.");
+        return;
+      }
+      saveDestinationPreference({
+        mode: "existing",
+        slideshowId: existingSlideshowId,
+        groupName: selectedGroup,
+      });
+      const selected = bootstrap.slideshows.find((s) => s.id === existingSlideshowId);
+      setError(null);
+      setSuccess(
+        `Saved destination: "${selected?.slideshowName || selected?.name || "Selected Slideshow"}" → "${selectedGroup}".`
+      );
+      return;
+    }
+
+    saveDestinationPreference({
+      mode: "new",
+      groupName: selectedGroup,
+    });
+    setError(null);
+    setSuccess(
+      `Saved destination for new slideshow mode${selectedGroup ? ` with group "${selectedGroup}"` : ""}.`
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -488,14 +519,23 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
         {error && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">{error}</div>}
         {success && <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-3">{success}</div>}
 
-        <button
-          onClick={submit}
-          disabled={isSubmitting}
-          className="w-full inline-flex items-center justify-center px-4 py-3 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-medium disabled:opacity-50"
-        >
-          <Upload className="h-4 w-4 mr-2" />
-          {isSubmitting ? "Uploading..." : "Upload Photos"}
-        </button>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button
+            onClick={saveDestinationForLater}
+            type="button"
+            className="w-full inline-flex items-center justify-center px-4 py-3 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium"
+          >
+            Save Destination for Later
+          </button>
+          <button
+            onClick={submit}
+            disabled={isSubmitting}
+            className="w-full inline-flex items-center justify-center px-4 py-3 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-medium disabled:opacity-50"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            {isSubmitting ? "Uploading..." : "Upload Photos"}
+          </button>
+        </div>
       </div>
 
       {activePreviewIndex !== null && previewItems[activePreviewIndex] && (
