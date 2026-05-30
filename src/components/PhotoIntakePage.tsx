@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Upload, ImagePlus } from "lucide-react";
+import { Upload, ImagePlus, ExternalLink } from "lucide-react";
 import { backendService, IntakeBootstrap } from "../services/api";
 import { clearSharedPayload, readSharedPayload } from "../utils/shareTargetPayload";
 import { emitUploadSync } from "../utils/slideshowSync";
@@ -36,6 +36,7 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [uploadedSlideshowId, setUploadedSlideshowId] = useState<string | null>(null);
   const [pwaInstalled, setPwaInstalled] = useState(false);
   const [shareTargetReady, setShareTargetReady] = useState(false);
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<BeforeInstallPromptEvent | null>(
@@ -201,6 +202,22 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
     [bootstrap, existingSlideshowId]
   );
 
+  const openSlideshowTargetId = useMemo(() => {
+    if (uploadedSlideshowId) return uploadedSlideshowId;
+    if (mode === "existing" && existingSlideshowId) return existingSlideshowId;
+    return null;
+  }, [uploadedSlideshowId, mode, existingSlideshowId]);
+
+  const showOpenSlideshowButton = useMemo(() => {
+    if (!openSlideshowTargetId) return false;
+    if (uploadedSlideshowId) return true;
+    return (
+      !!sharedPayloadId &&
+      files.length > 0 &&
+      !!success?.toLowerCase().includes("shared photo")
+    );
+  }, [openSlideshowTargetId, uploadedSlideshowId, sharedPayloadId, files.length, success]);
+
   const availableGroups = useMemo(() => {
     if (!bootstrap) return [];
     if (mode === "existing") {
@@ -253,6 +270,7 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
     setIsSubmitting(true);
     setError(null);
     setSuccess(null);
+    setUploadedSlideshowId(null);
     try {
       let slideshowId = existingSlideshowId;
       let slideshowLabel = selectedExisting?.slideshowName || selectedExisting?.name || "";
@@ -293,6 +311,7 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
       setSuccess(
         `Uploaded ${result.uploadedCount} photo${result.uploadedCount === 1 ? "" : "s"} to "${slideshowLabel}" → "${selectedGroup}".`
       );
+      setUploadedSlideshowId(slideshowId);
       setFiles([]);
       setNewSlideshowName("");
       if (mode === "new") {
@@ -517,7 +536,25 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
         </div>
 
         {error && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">{error}</div>}
-        {success && <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-3">{success}</div>}
+        {success && (
+          <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-3 space-y-3">
+            <p>{success}</p>
+            {showOpenSlideshowButton && openSlideshowTargetId && (
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.assign(
+                    `/?loadSlideshow=${encodeURIComponent(openSlideshowTargetId)}`
+                  );
+                }}
+                className="inline-flex items-center px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-medium"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Open Slideshow
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button
