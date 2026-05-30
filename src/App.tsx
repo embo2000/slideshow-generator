@@ -928,6 +928,34 @@ const normalizeLoadedClassData = (loaded: any) => {
     setSlideshowName(`${formatDate(monday)} to ${formatDate(sunday)}`);
   };
 
+  const loadSlideshowFromUrlRef = useRef(false);
+
+  useEffect(() => {
+    if (!currentUser || loadSlideshowFromUrlRef.current) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const loadId = params.get('loadSlideshow');
+    if (!loadId) return;
+
+    loadSlideshowFromUrlRef.current = true;
+
+    params.delete('loadSlideshow');
+    const remaining = params.toString();
+    const cleanUrl = remaining ? `${window.location.pathname}?${remaining}` : window.location.pathname;
+    window.history.replaceState({}, '', cleanUrl);
+
+    backendService
+      .loadSlideshow(loadId)
+      .then((data) => {
+        handleLoadSlideshow(data);
+        toast('Slideshow loaded.', 'success');
+      })
+      .catch((error) => {
+        console.error('Failed to load slideshow from URL:', error);
+        toast('Could not open the slideshow. It may have been deleted.', 'error');
+      });
+  }, [currentUser]);
+
   useEffect(() => {
     if (!currentUser) return;
 
