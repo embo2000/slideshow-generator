@@ -263,25 +263,31 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
     let destination: MediaStreamAudioDestinationNode | null = null;
     
     if (selectedMusic) {
-      backgroundAudio = new Audio(selectedMusic.url);
-      backgroundAudio.volume = 0.3; // Lower volume for background
-      backgroundAudio.loop = true;
-      backgroundAudio.crossOrigin = "anonymous"; // Enable CORS for audio processing
-      
-      // Set up audio context for proper stream mixing
       try {
-        audioContext = new AudioContext();
-        audioSource = audioContext.createMediaElementSource(backgroundAudio);
-        gainNode = audioContext.createGain();
-        gainNode.gain.value = 0.3; // Set volume
-        destination = audioContext.createMediaStreamDestination();
-        
-        audioSource.connect(gainNode);
-        gainNode.connect(destination);
-        gainNode.connect(audioContext.destination); // Also connect to speakers for monitoring
+        const playableMusicUrl = await backendService.getPlayableAssetUrl(selectedMusic);
+        backgroundAudio = new Audio(playableMusicUrl);
+        backgroundAudio.volume = 0.3; // Lower volume for background
+        backgroundAudio.loop = true;
+        backgroundAudio.crossOrigin = "anonymous"; // Enable CORS for audio processing
+
+        // Set up audio context for proper stream mixing
+        try {
+          audioContext = new AudioContext();
+          audioSource = audioContext.createMediaElementSource(backgroundAudio);
+          gainNode = audioContext.createGain();
+          gainNode.gain.value = 0.3; // Set volume
+          destination = audioContext.createMediaStreamDestination();
+
+          audioSource.connect(gainNode);
+          gainNode.connect(destination);
+          gainNode.connect(audioContext.destination); // Also connect to speakers for monitoring
+        } catch (error) {
+          console.warn('Audio context setup failed:', error);
+          audioContext = null;
+        }
       } catch (error) {
-        console.warn('Audio context setup failed:', error);
-        audioContext = null;
+        console.warn('Background music could not be prepared for generation:', error);
+        backgroundAudio = null;
       }
     }
 

@@ -100,6 +100,10 @@ const hashToken = (token) => crypto.createHash("sha256").update(token).digest("h
 const groupsSettingKey = (ownerEmail) => (ownerEmail ? `groups:${ownerEmail}` : "groups");
 const personalIntakeLinkSettingKey = (ownerEmail) => `personalIntakeLink:${ownerEmail}`;
 const PERSONAL_LINK_EXPIRY_DAYS = 3650;
+const ASSET_PLAYBACK_TOKEN_TTL_SECONDS = Math.max(
+  60,
+  Number(process.env.ASSET_PLAYBACK_TOKEN_TTL_SECONDS || 4 * 60 * 60)
+);
 
 const getRequestUserEmail = (req) => normalizeEmail(req.headers["x-user-email"]);
 
@@ -251,6 +255,49 @@ const pipeS3BodyToResponse = async (body, res) => {
     return;
   }
   res.end();
+};
+
+const getAssetPlaybackTokenSecret = () =>
+  process.env.ASSET_PLAYBACK_TOKEN_SECRET ||
+  process.env.S3_SECRET_ACCESS_KEY ||
+  process.env.DATABASE_URL ||
+  "local-development-asset-playback-secret";
+
+const signAssetPlaybackPayload = (payload) =>
+  crypto.createHmac("sha256", getAssetPlaybackTokenSecret()).update(payload).digest("base64url");
+
+const createAssetPlaybackToken = (assetId) => {
+  const expiresAt = Date.now() + ASSET_PLAYBACK_TOKEN_TTL_SECONDS * 1000;
+  const payload = Buffer.from(JSON.stringify({ assetId, expiresAt })).toString("base64url");
+  const signature = signAssetPlaybackPayload(payload);
+  return {
+    token: `${payload}.${signature}`,
+    expiresAt,
+  };
+};
+
+const hasValidAssetPlaybackToken = (assetId, token) => {
+  if (!token || typeof token !== "string") return false;
+
+  const [payload, signature] = token.split(".");
+  if (!payload || !signature) return false;
+
+  const expectedSignature = signAssetPlaybackPayload(payload);
+  const signatureBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expectedSignature);
+  if (
+    signatureBuffer.length !== expectedBuffer.length ||
+    !crypto.timingSafeEqual(signatureBuffer, expectedBuffer)
+  ) {
+    return false;
+  }
+
+  try {
+    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    return parsed.assetId === assetId && Number(parsed.expiresAt) > Date.now();
+  } catch {
+    return false;
+  }
 };
 
 app.get(`${apiPrefix}/health`, async (_req, res) => {

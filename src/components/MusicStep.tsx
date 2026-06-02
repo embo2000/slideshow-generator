@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Music, Play, Pause, Volume2, Upload, Link, X, Plus, Pencil, Trash2 } from 'lucide-react';
 import { MusicTrack } from '../types';
+import { backendService } from '../services/api';
 import WizardStepWrapper from './WizardStepWrapper';
 import { useDialog } from './ui/DialogProvider';
 
@@ -62,7 +63,7 @@ const MusicStep: React.FC<MusicStepProps> = ({
     };
   }, [audioRefs]);
 
-  const togglePlay = (track: MusicTrack) => {
+  const togglePlay = async (track: MusicTrack) => {
     if (playingTrack === track.id) {
       // Stop currently playing track
       if (audioRefs[track.id]) {
@@ -82,8 +83,20 @@ const MusicStep: React.FC<MusicStepProps> = ({
 
       // Create or play the selected track
       if (!audioRefs[track.id]) {
+        let playableUrl: string;
+        try {
+          playableUrl = await backendService.getPlayableAssetUrl(track);
+        } catch (error) {
+          console.error('Failed to create audio playback URL:', error);
+          const label = track.name || track.title || 'this audio file';
+          await alertDialog(`Unable to prepare "${label}" for playback. Please try again.`, {
+            title: 'Playback Error',
+          });
+          return;
+        }
+
         // Create new audio element
-        const audio = new Audio(track.url);
+        const audio = new Audio(playableUrl);
         audio.volume = 0.5;
         audio.preload = 'auto';
         audio.crossOrigin = 'anonymous';
@@ -93,10 +106,10 @@ const MusicStep: React.FC<MusicStepProps> = ({
           setPlayingTrack(null);
         });
         audio.addEventListener('error', () => {
-          console.error('Audio failed to load:', track.url);
+          console.error('Audio failed to load:', playableUrl);
           setPlayingTrack(null);
           const label = track.name || track.title || 'this audio file';
-          void alertDialog(`Unable to play "${label}". Check the audio file URL or S3 permissions.`, {
+          void alertDialog(`Unable to play "${label}". Check that the audio file still exists and try again.`, {
             title: 'Playback Error',
           });
         });
@@ -370,9 +383,10 @@ const MusicStep: React.FC<MusicStepProps> = ({
                             artist: 'Uploaded Music',
                             url: music.url,
                             duration: 0,
-                            isCustom: true
+                            isCustom: true,
+                            assetId: music.id
                           };
-                          togglePlay(tempTrack);
+                          void togglePlay(tempTrack);
                         }}
                         className="p-2 hover:bg-white rounded-full transition-colors"
                       >
@@ -446,7 +460,7 @@ const MusicStep: React.FC<MusicStepProps> = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          togglePlay(track);
+                          void togglePlay(track);
                         }}
                         className="p-2 hover:bg-white rounded-full transition-colors"
                       >
