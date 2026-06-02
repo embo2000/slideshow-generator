@@ -563,7 +563,7 @@ const handleLoadSlideshow = (data: {
     }
 
     // Handle music loading
-    let loadedSelectedMusic = data.selectedMusic;
+    const loadedSelectedMusic = data.selectedMusic;
     if (loadedSelectedMusic?.assetId && loadedSelectedMusic.url) {
       console.log('Using background music from Drive');
     }

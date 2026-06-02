@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Download, Play, Pause, RotateCcw } from 'lucide-react';
+import { X, Download, RotateCcw } from 'lucide-react';
 import { ClassData, MusicTrack, BackgroundOption, TransitionType } from '../types';
 import { backendService, StoredFile } from '../services/api';
 
@@ -55,19 +55,10 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
   const [uploadedVideo, setUploadedVideo] = useState<StoredFile | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [generationError, setGenerationError] = useState<string | null>(null);
-  
-  // Track previous image dimensions for smooth transitions
-  const [prevImageDimensions, setPrevImageDimensions] = useState<{
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  } | null>(null);
 
   // Auto-start video generation when component mounts
   useEffect(() => {
@@ -162,7 +153,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
         }
         break;
         
-      case 'zoom':
+      case 'zoom': {
         const zoomFactor = 1 + (progress * 0.1);
         const zoomedWidth = finalWidth * zoomFactor;
         const zoomedHeight = finalHeight * zoomFactor;
@@ -170,6 +161,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
         const zoomedY = finalY - (zoomedHeight - finalHeight) / 2;
         ctx.drawImage(currentImg, zoomedX, zoomedY, zoomedWidth, zoomedHeight);
         break;
+      }
         
       case 'flip':
         if (nextImg && progress > 0.5) {
