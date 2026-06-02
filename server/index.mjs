@@ -216,6 +216,11 @@ const ensureAudioAssetOwnership = (req, res, asset) => {
     return true;
   }
 
+  const token = typeof req.query.token === "string" ? req.query.token : null;
+  if (hasValidAssetPlaybackToken(asset.id, token)) {
+    return true;
+  }
+
   const ownerEmail = requireUserEmail(req, res);
   if (!ownerEmail) {
     return false;
@@ -882,6 +887,23 @@ app.get(`${apiPrefix}/assets`, async (req, res) => {
 
   const mapped = await Promise.all(assets.map((asset) => mapAssetForClient(asset)));
   res.json(mapped);
+});
+
+app.post(`${apiPrefix}/assets/:id/playback-token`, async (req, res) => {
+  const { id } = req.params;
+  const asset = await findAssetByIdOrKey(id, getRequestUserEmail(req));
+  if (!asset || asset.kind !== "audio") {
+    return res.status(404).json({ error: "Asset not found" });
+  }
+  if (!ensureAudioAssetOwnership(req, res, asset)) {
+    return;
+  }
+
+  const { token, expiresAt } = createAssetPlaybackToken(asset.id);
+  res.json({
+    path: `${apiPrefix}/assets/${encodeURIComponent(asset.id)}/content?token=${encodeURIComponent(token)}`,
+    expiresAt: new Date(expiresAt).toISOString(),
+  });
 });
 
 app.get(`${apiPrefix}/assets/:id/content`, async (req, res) => {

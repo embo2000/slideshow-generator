@@ -13,6 +13,35 @@ interface VideoGeneratorProps {
   onClose: () => void;
 }
 
+type PreviewableFile = File & { previewUrl?: string };
+
+type LoadedPhoto = {
+  image: HTMLImageElement;
+  className: string;
+  objectUrl?: string;
+};
+
+const getPhotoImageSource = (file: File): { src: string; objectUrl?: string } => {
+  const previewUrl = (file as PreviewableFile).previewUrl;
+  if (previewUrl) {
+    return { src: previewUrl };
+  }
+
+  const objectUrl = URL.createObjectURL(file);
+  return { src: objectUrl, objectUrl };
+};
+
+const loadImageElement = (src: string): Promise<HTMLImageElement> =>
+  new Promise((resolve, reject) => {
+    const img = new Image();
+    if (!src.startsWith('blob:') && !src.startsWith('data:')) {
+      img.crossOrigin = 'anonymous';
+    }
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Image failed to load'));
+    img.src = src;
+  });
+
 const VideoGenerator: React.FC<VideoGeneratorProps> = ({
   classData,
   selectedMusic,
@@ -30,6 +59,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
   const [uploadedVideo, setUploadedVideo] = useState<StoredFile | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [generationError, setGenerationError] = useState<string | null>(null);
   
   // Track previous image dimensions for smooth transitions
   const [prevImageDimensions, setPrevImageDimensions] = useState<{
@@ -246,10 +276,15 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
     setVideoUrl(null);
     setUploadedVideo(null);
     setUploadError(null);
+    setGenerationError(null);
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      setIsGenerating(false);
+      setGenerationError('Unable to prepare the video canvas.');
+      return;
+    }
 
     // Set canvas size to 1080p
     canvas.width = 1920;
@@ -294,11 +329,12 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
     // Load background image if provided
     let backgroundImg: HTMLImageElement | null = null;
     if (backgroundOption.type === 'image' && backgroundOption.image) {
-      backgroundImg = new Image();
-      backgroundImg.src = backgroundOption.image.url;
-      await new Promise((resolve) => {
-        backgroundImg!.onload = resolve;
-      });
+      try {
+        backgroundImg = await loadImageElement(backgroundOption.image.url);
+      } catch (error) {
+        console.warn('Background image failed to load; continuing without it:', error);
+        backgroundImg = null;
+      }
     }
 
     // Collect all photos
@@ -311,6 +347,30 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
 
     if (allPhotos.length === 0) {
       setIsGenerating(false);
+      setGenerationError('Add at least one photo before generating a video.');
+      return;
+    }
+
+    // Preload photo sources before recording. Saved slideshow photos are lightweight
+    // File placeholders with previewUrl, so URL.createObjectURL(file) would point at
+    // an empty blob and leave image.onload waiting forever.
+    const loadedPhotos: LoadedPhoto[] = [];
+    for (let i = 0; i < allPhotos.length; i++) {
+      const { file, className } = allPhotos[i];
+      const { src, objectUrl } = getPhotoImageSource(file);
+      try {
+        const image = await loadImageElement(src);
+        loadedPhotos.push({ image, className, objectUrl });
+      } catch (error) {
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        console.warn(`Skipping photo "${file.name}" because it could not be loaded.`, error);
+      }
+      setProgress(((i + 1) / allPhotos.length) * 5);
+    }
+
+    if (loadedPhotos.length === 0) {
+      setIsGenerating(false);
+      setGenerationError('None of the slideshow photos could be loaded. Please reload the slideshow and try again.');
       return;
     }
 
@@ -343,6 +403,9 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
     };
 
     mediaRecorder.onstop = async () => {
+      loadedPhotos.forEach((photo) => {
+        if (photo.objectUrl) URL.revokeObjectURL(photo.objectUrl);
+      });
       const blob = new Blob(chunks, { type: 'video/webm' });
       const url = URL.createObjectURL(blob);
       setVideoUrl(url);
@@ -398,27 +461,16 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
 
     // Animation parameters
     const photoDuration = slideDuration * 1000; // Convert seconds to milliseconds
-    const totalDuration = allPhotos.length * photoDuration;
+    const totalDuration = loadedPhotos.length * photoDuration;
     const fadeOutDuration = 2000; // 2 seconds fade out
     const fadeOutStartTime = totalDuration - fadeOutDuration;
     const startTime = Date.now();
     let previousDimensions: { x: number; y: number; width: number; height: number } | null = null;
-    
-    // Preload all images
-    const loadedImages: { [key: string]: HTMLImageElement } = {};
-    for (let i = 0; i < allPhotos.length; i++) {
-      const img = new Image();
-      img.src = URL.createObjectURL(allPhotos[i].file);
-      await new Promise((resolve) => {
-        img.onload = resolve;
-      });
-      loadedImages[i] = img;
-    }
 
     const animate = async () => {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(elapsed / totalDuration, 1);
-      setProgress(progress * 100);
+      setProgress(5 + progress * 95);
 
       // Handle music fade out
       if (backgroundAudio && elapsed >= fadeOutStartTime) {
@@ -437,10 +489,10 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
         return;
       }
 
-      const currentPhotoIndex = Math.floor((elapsed / photoDuration) % allPhotos.length);
-      const currentPhoto = allPhotos[currentPhotoIndex];
+      const currentPhotoIndex = Math.floor((elapsed / photoDuration) % loadedPhotos.length);
+      const currentPhoto = loadedPhotos[currentPhotoIndex];
       const photoProgress = (elapsed % photoDuration) / photoDuration;
-      const nextPhotoIndex = (currentPhotoIndex + 1) % allPhotos.length;
+      const nextPhotoIndex = (currentPhotoIndex + 1) % loadedPhotos.length;
 
       // Clear canvas and draw background
       if (backgroundImg) {
@@ -496,8 +548,8 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
       }
 
       // Get current and next images
-      const currentImg = loadedImages[currentPhotoIndex];
-      const nextImg = loadedImages[nextPhotoIndex];
+      const currentImg = currentPhoto.image;
+      const nextImg = loadedPhotos[nextPhotoIndex]?.image;
 
       if (currentImg) {
         // Calculate dimensions to fit image while maintaining aspect ratio
@@ -641,6 +693,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
     setVideoUrl(null);
     setUploadedVideo(null);
     setUploadError(null);
+    setGenerationError(null);
     setIsUploadingVideo(false);
     setProgress(0);
     setIsGenerating(false);
@@ -730,6 +783,12 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
                   <span className="text-red-700">{uploadError}</span>
                 )}
               </div>
+            </div>
+          )}
+
+          {generationError && (
+            <div className="mb-4 p-4 bg-red-50 rounded-lg border border-red-200 text-sm text-red-700">
+              {generationError}
             </div>
           )}
 
