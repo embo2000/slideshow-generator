@@ -52,6 +52,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
   onClose
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const hasStartedGenerationRef = useRef(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -62,8 +63,10 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
 
   // Auto-start video generation when component mounts
   useEffect(() => {
-    generateVideo();
-  }, []);
+    if (hasStartedGenerationRef.current) return;
+    hasStartedGenerationRef.current = true;
+    void generateVideo();
+  });
 
   // Transition helper functions
   const applyTransition = (
