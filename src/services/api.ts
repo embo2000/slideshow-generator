@@ -51,6 +51,21 @@ export interface SlideshowPayload {
 const apiBase = import.meta.env.VITE_API_BASE_URL || "/api";
 let currentUserEmail: string | null = null;
 
+const buildApiUrl = (path: string): string =>
+  `${apiBase.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
+
+const isAbsoluteUrl = (value: string): boolean => /^[a-z][a-z\d+\-.]*:/i.test(value);
+
+const extractAssetIdFromContentUrl = (url: string): string | null => {
+  try {
+    const parsed = new URL(url, window.location.origin);
+    const match = parsed.pathname.match(/\/assets\/([^/]+)\/content$/);
+    return match ? decodeURIComponent(match[1]) : null;
+  } catch {
+    return null;
+  }
+};
+
 const buildHeaders = (baseHeaders: HeadersInit = {}, includeJsonContentType = true): HeadersInit => {
   const headers: Record<string, string> = {};
 
@@ -78,7 +93,7 @@ const buildHeaders = (baseHeaders: HeadersInit = {}, includeJsonContentType = tr
 };
 
 const apiFetch = async <T>(path: string, init?: RequestInit): Promise<T> => {
-  const response = await fetch(`${apiBase}${path}`, {
+  const response = await fetch(buildApiUrl(path), {
     ...init,
     headers: buildHeaders(init?.headers, true),
   });
@@ -131,7 +146,7 @@ const uploadAsset = async (
   form.append("kind", kind);
   if (name) form.append("name", name);
 
-  const response = await fetch(`${apiBase}/assets/upload`, {
+  const response = await fetch(buildApiUrl("/assets/upload"), {
     method: "POST",
     body: form,
     headers: buildHeaders({}, false),
@@ -279,12 +294,35 @@ const saveSlideshow = async (params: {
   });
 };
 
+const getPlayableAssetUrl = async (track: Pick<MusicTrack, "url" | "assetId">): Promise<string> => {
+  const assetId = track.assetId || extractAssetIdFromContentUrl(track.url);
+  if (!assetId) {
+    return track.url;
+  }
+
+  const response = await apiFetch<{ path?: string; url?: string }>(
+    `/assets/${encodeURIComponent(assetId)}/playback-token`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    }
+  );
+
+  const playbackUrl = response.path || response.url;
+  if (!playbackUrl) {
+    return track.url;
+  }
+
+  return isAbsoluteUrl(playbackUrl) ? playbackUrl : buildApiUrl(playbackUrl);
+};
+
 export const backendService = {
   setCurrentUserEmail: (email: string | null) => {
     currentUserEmail = email?.trim().toLowerCase() || null;
   },
   saveSlideshow,
   uploadAsset,
+  getPlayableAssetUrl,
   renameAsset: (id: string, name: string) =>
     apiFetch<StoredFile>(`/assets/${id}`, {
       method: "PATCH",
@@ -339,7 +377,7 @@ export const backendService = {
     form.append("groupName", payload.groupName);
     payload.files.forEach((file) => form.append("files", file));
 
-    const response = await fetch(`${apiBase}/intake/${encodeURIComponent(token)}/upload`, {
+    const response = await fetch(buildApiUrl(`/intake/${encodeURIComponent(token)}/upload`), {
       method: "POST",
       body: form,
       headers: buildHeaders({}, false),
