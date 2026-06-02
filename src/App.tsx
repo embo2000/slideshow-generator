@@ -321,37 +321,57 @@ const getTotalPhotos = () => {
     createdTime: string;
     size?: string;
   }) => {
-    // Create audio element to get duration
-    const audio = new Audio(musicData.url);
-    audio.addEventListener('loadedmetadata', () => {
-      const durationInSeconds = Math.round(audio.duration);
+    const selectTrack = (duration: number) => {
       handleSelectMusic({
         id: musicData.id,
         name: musicData.name,
         title: musicData.name,
         artist: 'Your Music',
-        duration: durationInSeconds,
+        duration,
         url: musicData.url,
         assetId: musicData.id
       });
-    });
-    
-    audio.addEventListener('error', () => {
-      console.error('Failed to load audio metadata for:', musicData.name);
-      // Set music without duration if metadata loading fails
-      handleSelectMusic({
-        id: musicData.id,
-        name: musicData.name,
-        title: musicData.name,
-        artist: 'Your Music',
-        duration: 0,
-        url: musicData.url,
-        assetId: musicData.id
+    };
+
+    const loadMetadata = async () => {
+      let playableUrl: string;
+      try {
+        playableUrl = await backendService.getPlayableAssetUrl({
+          url: musicData.url,
+          assetId: musicData.id,
+        });
+      } catch (error) {
+        console.error('Failed to prepare audio metadata URL for:', musicData.name, error);
+        selectTrack(0);
+        return;
+      }
+
+      const cleanupPlayableUrl = () => {
+        if (playableUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(playableUrl);
+        }
+      };
+
+      // Create audio element to get duration
+      const audio = new Audio(playableUrl);
+      audio.addEventListener('loadedmetadata', () => {
+        const durationInSeconds = Number.isFinite(audio.duration) ? Math.round(audio.duration) : 0;
+        selectTrack(durationInSeconds);
+        cleanupPlayableUrl();
       });
-    });
+      
+      audio.addEventListener('error', () => {
+        console.error('Failed to load audio metadata for:', musicData.name);
+        // Set music without duration if metadata loading fails
+        selectTrack(0);
+        cleanupPlayableUrl();
+      });
+      
+      // Load the audio to trigger metadata loading
+      audio.load();
+    };
     
-    // Load the audio to trigger metadata loading
-    audio.load();
+    void loadMetadata();
   };
 
   const handleRenameExistingMusic = async (musicId: string, newName: string) => {
@@ -543,7 +563,7 @@ const handleLoadSlideshow = (data: {
     }
 
     // Handle music loading
-    let loadedSelectedMusic = data.selectedMusic;
+    const loadedSelectedMusic = data.selectedMusic;
     if (loadedSelectedMusic?.assetId && loadedSelectedMusic.url) {
       console.log('Using background music from Drive');
     }
