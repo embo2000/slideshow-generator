@@ -56,6 +56,13 @@ const buildApiUrl = (path: string): string =>
 
 const isAbsoluteUrl = (value: string): boolean => /^[a-z][a-z\d+\-.]*:/i.test(value);
 
+const resolveAssetFetchUrl = (url: string): string => {
+  if (isAbsoluteUrl(url) || url.startsWith("/api/")) {
+    return url;
+  }
+  return buildApiUrl(url);
+};
+
 const extractAssetIdFromContentUrl = (url: string): string | null => {
   try {
     const parsed = new URL(url, window.location.origin);
@@ -300,20 +307,32 @@ const getPlayableAssetUrl = async (track: Pick<MusicTrack, "url" | "assetId">): 
     return track.url;
   }
 
-  const response = await apiFetch<{ path?: string; url?: string }>(
-    `/assets/${encodeURIComponent(assetId)}/playback-token`,
-    {
-      method: "POST",
-      body: JSON.stringify({}),
-    }
-  );
+  try {
+    const response = await apiFetch<{ path?: string; url?: string }>(
+      `/assets/${encodeURIComponent(assetId)}/playback-token`,
+      {
+        method: "POST",
+        body: JSON.stringify({}),
+      }
+    );
 
-  const playbackUrl = response.path || response.url;
-  if (!playbackUrl) {
-    return track.url;
+    const playbackUrl = response.path || response.url;
+    if (playbackUrl) {
+      return isAbsoluteUrl(playbackUrl) ? playbackUrl : buildApiUrl(playbackUrl);
+    }
+  } catch (error) {
+    console.warn("Playback token unavailable; falling back to authenticated audio fetch.", error);
   }
 
-  return isAbsoluteUrl(playbackUrl) ? playbackUrl : buildApiUrl(playbackUrl);
+  const response = await fetch(resolveAssetFetchUrl(track.url), {
+    headers: buildHeaders({}, false),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(formatApiErrorBody(text) || `Audio request failed with ${response.status}`);
+  }
+
+  return URL.createObjectURL(await response.blob());
 };
 
 export const backendService = {
