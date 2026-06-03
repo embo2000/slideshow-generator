@@ -912,24 +912,49 @@ app.get(`${apiPrefix}/assets/:id/content`, async (req, res) => {
   if (!asset) {
     return res.status(404).json({ error: "Asset not found" });
   }
-  if (!ensureAudioAssetOwnership(req, res, asset)) {
+
+  const queryToken = Array.isArray(req.query.token) ? req.query.token[0] : req.query.token;
+  const legacyQueryToken = Array.isArray(req.query.playbackToken)
+    ? req.query.playbackToken[0]
+    : req.query.playbackToken;
+  const hasPlaybackToken =
+    asset.kind === "audio" && hasValidAssetPlaybackToken(asset.id, queryToken || legacyQueryToken);
+
+  if (!hasPlaybackToken && !ensureAudioAssetOwnership(req, res, asset)) {
     return;
   }
 
   const rangeHeader = req.headers.range;
   try {
     if (rangeHeader) {
-      const head = await s3.send(
-        new HeadObjectCommand({
-          Bucket: process.env.S3_BUCKET,
-          Key: asset.s3Key,
-        })
-      );
+      let total = Number(asset.size || 0);
+      if (!Number.isFinite(total) || total <= 0) {
+        const head = await s3.send(
+          new HeadObjectCommand({
+            Bucket: process.env.S3_BUCKET,
+            Key: asset.s3Key,
+          })
+        );
+        total = Number(head.ContentLength || 0);
+      }
 
-      const total = Number(head.ContentLength || asset.size || 0);
+      if (!Number.isFinite(total) || total <= 0) {
+        res.setHeader("Accept-Ranges", "bytes");
+        res.status(416).end();
+        return;
+      }
+
       const range = rangeHeader.replace(/bytes=/, "").split("-");
       const start = Number.parseInt(range[0], 10) || 0;
-      const end = range[1] ? Number.parseInt(range[1], 10) : total - 1;
+      const requestedEnd = range[1] ? Number.parseInt(range[1], 10) : total - 1;
+      const end = Number.isFinite(requestedEnd) ? requestedEnd : total - 1;
+
+      if (start >= total || start < 0 || end < start) {
+        res.setHeader("Content-Range", `bytes */${total}`);
+        res.setHeader("Accept-Ranges", "bytes");
+        res.status(416).end();
+        return;
+      }
 
       const chunkEnd = Math.min(end, total - 1);
       const chunkSize = chunkEnd - start + 1;
@@ -966,7 +991,11 @@ app.get(`${apiPrefix}/assets/:id/content`, async (req, res) => {
     await pipeS3BodyToResponse(response.Body, res);
   } catch (error) {
     console.error("Failed to stream asset content:", error);
-    res.status(500).json({ error: "Failed to stream asset" });
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Failed to stream asset" });
+    } else {
+      res.end();
+    }
   }
 });
 
