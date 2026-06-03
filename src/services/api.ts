@@ -51,8 +51,23 @@ export interface SlideshowPayload {
 const apiBase = import.meta.env.VITE_API_BASE_URL || "/api";
 let currentUserEmail: string | null = null;
 
-const buildApiUrl = (path: string): string =>
-  `${apiBase.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
+const buildApiUrl = (path: string): string => {
+  if (/^[a-z][a-z\d+\-.]*:/i.test(path)) {
+    return path;
+  }
+
+  const normalizedBase = apiBase.replace(/\/$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+
+  if (
+    normalizedPath.startsWith("/api/") &&
+    (normalizedBase === "/api" || normalizedBase.endsWith("/api"))
+  ) {
+    return `${normalizedBase.slice(0, -"/api".length)}${normalizedPath}`;
+  }
+
+  return `${normalizedBase}${normalizedPath}`;
+};
 
 const isAbsoluteUrl = (value: string): boolean => /^[a-z][a-z\d+\-.]*:/i.test(value);
 
