@@ -318,7 +318,7 @@ const getPlayableAssetUrl = async (track: Pick<MusicTrack, "url" | "assetId">): 
 
     const playbackUrl = response.path || response.url;
     if (playbackUrl) {
-      return isAbsoluteUrl(playbackUrl) ? playbackUrl : buildApiUrl(playbackUrl);
+      return resolveAssetFetchUrl(playbackUrl);
     }
   } catch (error) {
     console.warn("Playback token unavailable; falling back to authenticated audio fetch.", error);

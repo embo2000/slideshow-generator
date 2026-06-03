@@ -901,7 +901,7 @@ app.post(`${apiPrefix}/assets/:id/playback-token`, async (req, res) => {
 
   const { token, expiresAt } = createAssetPlaybackToken(asset.id);
   res.json({
-    path: `${apiPrefix}/assets/${encodeURIComponent(asset.id)}/content?token=${encodeURIComponent(token)}`,
+    path: `/assets/${encodeURIComponent(asset.id)}/content?token=${encodeURIComponent(token)}`,
     expiresAt: new Date(expiresAt).toISOString(),
   });
 });
