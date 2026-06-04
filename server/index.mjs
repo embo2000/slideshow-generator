@@ -19,11 +19,25 @@ const app = express();
 const prisma = new PrismaClient();
 const MAX_PHOTOS_PER_GROUP = 5;
 
+const normalizePhotoName = (name) =>
+  typeof name === "string" ? name.trim().toLowerCase().replace(/\s+/g, " ") : "";
+
+/** Collapse duplicate uploads of the same file name across groups (last group in `classes` wins). */
+const photoDedupeKey = (image) => {
+  if (!image || typeof image !== "object") return null;
+  const normalizedName = normalizePhotoName(image.name);
+  if (normalizedName) return `name:${normalizedName}`;
+  if (image.id) return `id:${image.id}`;
+  if (image.url) return `url:${image.url}`;
+  return null;
+};
+
 const photoAssetKey = (image) => {
   if (!image || typeof image !== "object") return null;
   if (image.id) return `id:${image.id}`;
+  const normalizedName = normalizePhotoName(image.name);
+  if (normalizedName) return `name:${normalizedName}`;
   if (image.url) return `url:${image.url}`;
-  if (image.name) return `name:${image.name}`;
   return null;
 };
 
@@ -53,21 +67,12 @@ const mergeClassData = (existingClassData, incomingClassData) => {
   return merged;
 };
 
-const reconcileClassDataForSave = (existingClassData, incomingClassData) => {
-  const merged =
-    existingClassData && typeof existingClassData === "object" ? { ...existingClassData } : {};
-  const incomingPhotoIds = collectReferencedAssetIds(incomingClassData);
+const reconcileClassDataForSave = (incomingClassData, classes) => {
+  const groups = Array.isArray(classes) ? classes : Object.keys(incomingClassData || {});
+  const reconciled = Object.fromEntries(groups.map((groupName) => [groupName, []]));
 
-  // Drop moved photos from their old groups before applying incoming assignments.
-  for (const [groupName, images] of Object.entries(merged)) {
-    if (!Array.isArray(images)) continue;
-    merged[groupName] = images.filter((image) => {
-      const id = image?.id;
-      return !id || !incomingPhotoIds.has(id);
-    });
-  }
-
-  for (const [groupName, incomingImages] of Object.entries(incomingClassData || {})) {
+  for (const groupName of groups) {
+    const incomingImages = incomingClassData?.[groupName];
     if (!Array.isArray(incomingImages)) continue;
 
     const seen = new Set();
@@ -81,22 +86,23 @@ const reconcileClassDataForSave = (existingClassData, incomingClassData) => {
       next.push(image);
     }
 
-    merged[groupName] = next.slice(0, MAX_PHOTOS_PER_GROUP);
+    reconciled[groupName] = next.slice(0, MAX_PHOTOS_PER_GROUP);
   }
 
-  return merged;
+  return normalizeClassDataForClient(groups, reconciled);
 };
 
 const normalizeClassDataForClient = (classes, classData) => {
   const groups = Array.isArray(classes) ? classes : [];
   const source = classData && typeof classData === "object" ? classData : {};
-  const assignmentById = new Map();
+  const assignmentByKey = new Map();
 
   const recordAssignments = (groupName, images) => {
     if (!Array.isArray(images)) return;
     for (const image of images) {
-      if (!image?.id) continue;
-      assignmentById.set(image.id, { image, groupName });
+      const key = photoDedupeKey(image);
+      if (!key) continue;
+      assignmentByKey.set(key, { image, groupName });
     }
   };
 
@@ -110,7 +116,7 @@ const normalizeClassDataForClient = (classes, classData) => {
   }
 
   const normalized = Object.fromEntries(groups.map((groupName) => [groupName, []]));
-  for (const { image, groupName } of assignmentById.values()) {
+  for (const { image, groupName } of assignmentByKey.values()) {
     if (!normalized[groupName]) normalized[groupName] = [];
     if (normalized[groupName].length < MAX_PHOTOS_PER_GROUP) {
       normalized[groupName].push(image);
@@ -139,31 +145,22 @@ const countClassDataPhotos = (classData) => {
   }, 0);
 };
 
-const countUniqueClassDataPhotos = (classData) => collectReferencedAssetIds(classData).size;
-
-const resolveClassDataForSave = (existingSlideshow, incomingClassData) => {
+const resolveClassDataForSave = (existingSlideshow, incomingClassData, payloadClasses) => {
   const existingData = existingSlideshow?.classData;
   const existingCount = countClassDataPhotos(existingData);
   const incomingCount = countClassDataPhotos(incomingClassData);
+  const classes =
+    Array.isArray(payloadClasses) && payloadClasses.length > 0
+      ? payloadClasses
+      : Array.isArray(existingSlideshow?.classes)
+        ? existingSlideshow.classes
+        : [];
 
   if (existingSlideshow && existingCount > 0 && incomingCount === 0) {
     return existingData;
   }
 
-  const merged = existingSlideshow
-    ? reconcileClassDataForSave(existingData, incomingClassData)
-    : incomingClassData || {};
-
-  const existingUniqueCount = countUniqueClassDataPhotos(existingData);
-  const mergedUniqueCount = countUniqueClassDataPhotos(merged);
-  if (existingSlideshow && mergedUniqueCount < existingUniqueCount) {
-    console.warn(
-      `Blocked slideshow save that would reduce unique photos from ${existingUniqueCount} to ${mergedUniqueCount}`
-    );
-    return existingData;
-  }
-
-  return merged;
+  return reconcileClassDataForSave(incomingClassData || {}, classes);
 };
 
 const mapAssetToClassPhoto = (asset) => ({
@@ -1507,7 +1504,11 @@ app.post(`${apiPrefix}/slideshows`, async (req, res) => {
     return res.status(404).json({ error: "Slideshow not found" });
   }
 
-  const mergedClassData = resolveClassDataForSave(existingSlideshow, baseData.classData);
+  const mergedClassData = resolveClassDataForSave(
+    existingSlideshow,
+    baseData.classData,
+    baseData.classes
+  );
 
   const saved = existingSlideshow
     ? await prisma.slideshow.update({

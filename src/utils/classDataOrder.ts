@@ -1,5 +1,19 @@
 import { ClassData } from "../types";
 
+export const normalizePhotoName = (name: string) =>
+  name.trim().toLowerCase().replace(/\s+/g, " ");
+
+export const getPhotoIdentityKey = (
+  file: File,
+  getAssetId: (file: File) => string | undefined
+): string | undefined => {
+  const normalizedName = normalizePhotoName(file.name);
+  if (normalizedName) return `name:${normalizedName}`;
+  const assetId = getAssetId(file);
+  if (assetId) return `id:${assetId}`;
+  return undefined;
+};
+
 export const getClassesWithPhotosInOrder = (
   classes: string[],
   classData: ClassData
@@ -28,13 +42,13 @@ export const dedupeClassDataByAssetId = (
   classData: ClassData,
   getAssetId: (file: File) => string | undefined
 ): ClassData => {
-  const assignmentById = new Map<string, { file: File; groupName: string }>();
+  const assignmentByKey = new Map<string, { file: File; groupName: string }>();
 
   const recordGroup = (groupName: string, photos: File[]) => {
     for (const file of photos) {
-      const assetId = getAssetId(file);
-      if (!assetId) continue;
-      assignmentById.set(assetId, { file, groupName });
+      const key = getPhotoIdentityKey(file, getAssetId);
+      if (!key) continue;
+      assignmentByKey.set(key, { file, groupName });
     }
   };
 
@@ -48,7 +62,7 @@ export const dedupeClassDataByAssetId = (
   }
 
   const deduped: ClassData = Object.fromEntries(classes.map((groupName) => [groupName, []]));
-  for (const { file, groupName } of assignmentById.values()) {
+  for (const { file, groupName } of assignmentByKey.values()) {
     if (!deduped[groupName]) deduped[groupName] = [];
     deduped[groupName].push(file);
   }

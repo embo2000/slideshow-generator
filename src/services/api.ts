@@ -184,6 +184,27 @@ const uploadAsset = async (
   return response.json() as Promise<StoredFile>;
 };
 
+const resolveStoredPhotoForFile = (
+  file: File,
+  uploadedPhotoAssets?: WeakMap<File, StoredFile>
+): StoredFile | null => {
+  const uploadedFromCache = uploadedPhotoAssets?.get(file);
+  if (uploadedFromCache?.id) return uploadedFromCache;
+
+  const previewUrl = (file as File & { previewUrl?: string }).previewUrl;
+  const assetIdFromUrl = previewUrl?.match(/\/assets\/([^/]+)\/content/)?.[1];
+  if (assetIdFromUrl) {
+    return {
+      id: assetIdFromUrl,
+      name: file.name,
+      url: previewUrl || `/api/assets/${assetIdFromUrl}/content`,
+      createdTime: new Date().toISOString(),
+    };
+  }
+
+  return null;
+};
+
 const serializeClassData = async (
   classData: ClassData,
   classes: string[],
@@ -195,12 +216,15 @@ const serializeClassData = async (
     const files = classData[className] ?? [];
     result[className] = [];
     for (const file of files) {
-      const uploadedFromCache = uploadedPhotoAssets?.get(file);
-      if (uploadedFromCache) {
+      const existing = resolveStoredPhotoForFile(file, uploadedPhotoAssets);
+      if (existing) {
+        if (uploadedPhotoAssets) {
+          uploadedPhotoAssets.set(file, existing);
+        }
         result[className].push({
-          id: uploadedFromCache.id,
-          name: uploadedFromCache.name,
-          url: uploadedFromCache.url,
+          id: existing.id,
+          name: existing.name,
+          url: existing.url,
         });
         continue;
       }
