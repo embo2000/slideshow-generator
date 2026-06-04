@@ -369,7 +369,7 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
       });
 
       setSuccess(
-        `Uploaded ${result.uploadedCount} photo${result.uploadedCount === 1 ? "" : "s"} to "${slideshowLabel}" → "${selectedGroup}".`
+        `Uploaded ${result.uploadedCount} photo${result.uploadedCount === 1 ? "" : "s"} to "${slideshowLabel}" → "${selectedGroup}". Open the main app on desktop to see them — it refreshes automatically when you switch back to that tab.`
       );
       setUploadedSlideshowId(slideshowId);
       revokePhotoPreviews(files);
@@ -532,11 +532,17 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg"
             >
               <option value="">Select slideshow</option>
-              {bootstrap?.slideshows.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.slideshowName || item.name}
-                </option>
-              ))}
+              {bootstrap?.slideshows.map((item) => {
+                const totalPhotos =
+                  item.totalPhotoCount ??
+                  Object.values(item.groupPhotoCounts || {}).reduce((sum, count) => sum + count, 0);
+                const label = `${item.slideshowName || item.name} (${totalPhotos} photo${totalPhotos === 1 ? "" : "s"})`;
+                return (
+                  <option key={item.id} value={item.id}>
+                    {label}
+                  </option>
+                );
+              })}
             </select>
           </div>
         ) : (

@@ -19,6 +19,46 @@ const app = express();
 const prisma = new PrismaClient();
 const MAX_PHOTOS_PER_GROUP = 5;
 
+const photoAssetKey = (image) => {
+  if (!image || typeof image !== "object") return null;
+  if (image.id) return `id:${image.id}`;
+  if (image.url) return `url:${image.url}`;
+  if (image.name) return `name:${image.name}`;
+  return null;
+};
+
+const mergeClassData = (existingClassData, incomingClassData) => {
+  const merged =
+    existingClassData && typeof existingClassData === "object" ? { ...existingClassData } : {};
+
+  for (const [groupName, incomingImages] of Object.entries(incomingClassData || {})) {
+    if (!Array.isArray(incomingImages)) continue;
+
+    const existingImages = Array.isArray(merged[groupName]) ? merged[groupName] : [];
+    const seen = new Set();
+    const combined = [];
+
+    for (const image of [...existingImages, ...incomingImages]) {
+      const key = photoAssetKey(image);
+      if (key) {
+        if (seen.has(key)) continue;
+        seen.add(key);
+      }
+      combined.push(image);
+    }
+
+    merged[groupName] = combined.slice(0, MAX_PHOTOS_PER_GROUP);
+  }
+
+  return merged;
+};
+
+const isIntakeImageFile = (file) => {
+  if (file.mimetype?.startsWith("image/")) return true;
+  const name = file.originalname || "";
+  return /\.(jpe?g|png|gif|webp|heic|heif|bmp|avif)$/i.test(name);
+};
+
 const requiredEnv = [
   "DATABASE_URL",
   "S3_BUCKET",
@@ -532,6 +572,10 @@ app.get(`${apiPrefix}/intake/:token/bootstrap`, async (req, res) => {
           Array.isArray(classData[group]) ? classData[group].length : 0,
         ])
       );
+      const totalPhotoCount = Object.values(classData).reduce(
+        (sum, images) => sum + (Array.isArray(images) ? images.length : 0),
+        0
+      );
 
       return {
         id: item.id,
@@ -539,6 +583,7 @@ app.get(`${apiPrefix}/intake/:token/bootstrap`, async (req, res) => {
         slideshowName: item.slideshowName,
         classes,
         groupPhotoCounts,
+        totalPhotoCount,
         updatedAt: item.updatedAt.toISOString(),
       };
     }),
@@ -664,7 +709,7 @@ app.post(`${apiPrefix}/intake/:token/upload`, intakeUpload.array("files", 20), a
   const seenIncoming = new Set();
   const uniqueImageFiles = [];
   for (const file of files) {
-    if (!file.mimetype?.startsWith("image/")) {
+    if (!isIntakeImageFile(file)) {
       continue;
     }
     const dedupeKey = `${file.originalname}:${file.size}`;
@@ -1221,20 +1266,36 @@ app.post(`${apiPrefix}/slideshows`, async (req, res) => {
     slideDuration: Number(payload.slideDuration || 3),
   };
 
-  const saved = await prisma.slideshow.upsert({
-    where: {
-      ownerEmail_name: {
-        ownerEmail,
-        name: payload.name,
-      },
-    },
-    update: baseData,
-    create: {
-      ownerEmail,
-      name: payload.name,
-      ...baseData,
-    },
-  });
+  let existingSlideshow = null;
+  if (payload.id && typeof payload.id === "string") {
+    existingSlideshow = await prisma.slideshow.findUnique({ where: { id: payload.id } });
+  } else {
+    existingSlideshow = await prisma.slideshow.findFirst({
+      where: { ownerEmail, name: payload.name },
+    });
+  }
+
+  if (existingSlideshow && existingSlideshow.ownerEmail !== ownerEmail) {
+    return res.status(404).json({ error: "Slideshow not found" });
+  }
+
+  const mergedClassData = existingSlideshow
+    ? mergeClassData(existingSlideshow.classData, baseData.classData)
+    : baseData.classData;
+
+  const saved = existingSlideshow
+    ? await prisma.slideshow.update({
+        where: { id: existingSlideshow.id },
+        data: { ...baseData, classData: mergedClassData },
+      })
+    : await prisma.slideshow.create({
+        data: {
+          ownerEmail,
+          name: payload.name,
+          ...baseData,
+          classData: mergedClassData,
+        },
+      });
 
   res.json({
     id: saved.id,

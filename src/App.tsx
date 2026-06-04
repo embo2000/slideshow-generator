@@ -732,6 +732,7 @@ const normalizeLoadedClassData = (loaded: any) => {
 
       // Persist group changes immediately on the active slideshow as well.
       const saved = await backendService.saveSlideshow({
+        id: currentSlideshowId,
         name: slideshowName,
         classData: newClassData,
         selectedMusic,
@@ -784,6 +785,7 @@ const normalizeLoadedClassData = (loaded: any) => {
 
     try {
       const saved = await backendService.saveSlideshow({
+        id: currentSlideshowId,
         name: slideshowName,
         classData,
         selectedMusic,
@@ -999,6 +1001,30 @@ const normalizeLoadedClassData = (loaded: any) => {
 
     return unsubscribe;
   }, [currentUser, currentSlideshowId, slideshowName, currentStep]);
+
+  useEffect(() => {
+    if (!currentUser || !currentSlideshowId) return;
+
+    const reloadCurrentSlideshow = async () => {
+      try {
+        const previousStep = currentStep;
+        const refreshed = await backendService.loadSlideshow(currentSlideshowId);
+        handleLoadSlideshow(refreshed);
+        setCurrentStep(previousStep);
+      } catch (error) {
+        console.error('Failed to refresh slideshow after returning to app:', error);
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        reloadCurrentSlideshow();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, [currentUser, currentSlideshowId, currentStep]);
   const renderCurrentStep = () => {
     if (currentStep < classes.length) {
       // Image group upload steps

@@ -26,6 +26,7 @@ export interface IntakeBootstrap {
     slideshowName: string;
     classes: string[];
     groupPhotoCounts: Record<string, number>;
+    totalPhotoCount: number;
     updatedAt: string;
   }>;
 }
@@ -230,6 +231,7 @@ const serializeClassData = async (
 };
 
 const saveSlideshow = async (params: {
+  id?: string | null;
   name: string;
   classData: ClassData;
   selectedMusic: MusicTrack | null;
@@ -305,6 +307,7 @@ const saveSlideshow = async (params: {
   return apiFetch<StoredSlideshow>("/slideshows", {
     method: "POST",
     body: JSON.stringify({
+      id: params.id || undefined,
       name: params.name,
       classData: uploadedClassData,
       selectedMusic,
