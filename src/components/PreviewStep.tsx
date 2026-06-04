@@ -20,6 +20,7 @@ interface PreviewStepProps {
   onAutoSave?: () => Promise<void>;
   classes: string[];
   onMovePhotoToGroup?: (fromGroup: string, photoIndex: number, toGroup: string) => boolean;
+  onReorderPhotoInGroup?: (groupName: string, fromIndex: number, toIndex: number) => void;
   onRemovePhotoFromGroup?: (groupName: string, photoIndex: number) => void;
 }
 
@@ -44,11 +45,13 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
   onAutoSave,
   classes,
   onMovePhotoToGroup,
+  onReorderPhotoInGroup,
   onRemovePhotoFromGroup,
 }) => {
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [dropTargetGroup, setDropTargetGroup] = useState<string | null>(null);
+  const [dropTargetSlot, setDropTargetSlot] = useState<{ groupName: string; index: number } | null>(null);
   const [draggingFromGroup, setDraggingFromGroup] = useState<string | null>(null);
   const [activePreview, setActivePreview] = useState<{ groupName: string; index: number } | null>(null);
   const dragSessionRef = useRef(false);
@@ -91,6 +94,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
   const handlePhotoDragEnd = () => {
     setDraggingFromGroup(null);
     setDropTargetGroup(null);
+    setDropTargetSlot(null);
     window.setTimeout(() => {
       dragSessionRef.current = false;
     }, 0);
@@ -106,15 +110,17 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
   );
 
   const handleGroupDragOver = (event: React.DragEvent, groupName: string) => {
-    if (!onMovePhotoToGroup) return;
+    if (!onMovePhotoToGroup && !onReorderPhotoInGroup) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
     setDropTargetGroup(groupName);
+    setDropTargetSlot(null);
   };
 
   const handleGroupDrop = (event: React.DragEvent, toGroup: string) => {
     event.preventDefault();
     setDropTargetGroup(null);
+    setDropTargetSlot(null);
     setDraggingFromGroup(null);
     if (!onMovePhotoToGroup) return;
 
@@ -124,6 +130,43 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
 
     onMovePhotoToGroup(payload.fromGroup, payload.photoIndex, toGroup);
   };
+
+  const handlePhotoSlotDragOver = (
+    event: React.DragEvent,
+    groupName: string,
+    index: number
+  ) => {
+    if (!onMovePhotoToGroup && !onReorderPhotoInGroup) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = 'move';
+    setDropTargetSlot({ groupName, index });
+    setDropTargetGroup(null);
+  };
+
+  const handlePhotoSlotDrop = (
+    event: React.DragEvent,
+    groupName: string,
+    toIndex: number
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setDropTargetSlot(null);
+    setDropTargetGroup(null);
+    setDraggingFromGroup(null);
+
+    const payload = readDragPayload(event);
+    if (!payload) return;
+
+    if (payload.fromGroup === groupName) {
+      onReorderPhotoInGroup?.(groupName, payload.photoIndex, toIndex);
+      return;
+    }
+
+    onMovePhotoToGroup?.(payload.fromGroup, payload.photoIndex, groupName);
+  };
+
+  const canDragPhotos = Boolean(onMovePhotoToGroup || onReorderPhotoInGroup);
 
   const getTotalDuration = () => {
     return Math.round((getTotalPhotos() * slideDuration) / 60 * 10) / 10; // Convert to minutes, round to 1 decimal
@@ -344,8 +387,8 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
         <div>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Photos by Image Group</h3>
-            {onMovePhotoToGroup && (
-              <p className="text-sm text-gray-500">Drag photos between groups to reorganize</p>
+            {canDragPhotos && (
+              <p className="text-sm text-gray-500">Drag photos to reorder within a group or move between groups</p>
             )}
           </div>
           <div className="space-y-4">
@@ -384,17 +427,24 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
                     </button>
                   </div>
                   <div className="grid grid-cols-5 gap-2 min-h-[4.5rem]">
-                    {photos.map((photo, index) => (
+                    {photos.map((photo, index) => {
+                      const isDropSlot =
+                        dropTargetSlot?.groupName === groupName &&
+                        dropTargetSlot.index === index;
+
+                      return (
                       <div
                         key={`${groupName}-${index}`}
-                        draggable={Boolean(onMovePhotoToGroup)}
+                        draggable={canDragPhotos}
                         onDragStart={(event) => handlePhotoDragStart(event, groupName, index)}
                         onDragEnd={handlePhotoDragEnd}
+                        onDragOver={(event) => handlePhotoSlotDragOver(event, groupName, index)}
+                        onDrop={(event) => handlePhotoSlotDrop(event, groupName, index)}
                         onClick={() => handlePhotoClick(groupName, index)}
                         className={`relative group rounded border overflow-hidden bg-white ${
-                          onMovePhotoToGroup ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
-                        }`}
-                        title="Click to view · drag to another group"
+                          canDragPhotos ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
+                        } ${isDropSlot ? 'ring-2 ring-teal-500 scale-[1.02]' : ''}`}
+                        title="Click to view · drag to reorder or move"
                         role="button"
                         tabIndex={0}
                         onKeyDown={(event) => {
@@ -409,7 +459,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
                           alt={`${groupName} photo ${index + 1}`}
                           className="w-full aspect-square object-cover pointer-events-none"
                         />
-                        {onMovePhotoToGroup && (
+                        {canDragPhotos && (
                           <div className="absolute top-1 left-1 rounded bg-black/45 text-white p-0.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                             <GripVertical className="h-3 w-3" />
                           </div>
@@ -420,8 +470,9 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
                           />
                         )}
                       </div>
-                    ))}
-                    {photos.length === 0 && onMovePhotoToGroup && (
+                      );
+                    })}
+                    {photos.length === 0 && canDragPhotos && (
                       <div className="col-span-5 flex items-center justify-center rounded border-2 border-dashed border-gray-300 text-sm text-gray-400 min-h-[4.5rem]">
                         Drop photos here
                       </div>

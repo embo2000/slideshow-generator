@@ -934,8 +934,7 @@ app.post(`${apiPrefix}/assets/upload`, upload.single("file"), async (req, res) =
     }
 
     const displayName = (req.body.name || req.file.originalname).trim();
-    const s3Prefix = kind === "video" ? "photo" : kind;
-    const objectKey = `${s3Prefix}/${Date.now()}-${crypto.randomUUID()}-${normalizeName(
+    const objectKey = `${kind}/${Date.now()}-${crypto.randomUUID()}-${normalizeName(
       req.file.originalname
     )}`;
 

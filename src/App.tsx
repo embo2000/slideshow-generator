@@ -206,6 +206,23 @@ function App() {
     return true;
   };
 
+  const reorderPhotoInGroup = (groupName: string, fromIndex: number, toIndex: number) => {
+    const photos = classData[groupName] ?? [];
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
+    if (fromIndex >= photos.length || toIndex >= photos.length) return;
+
+    const nextPhotos = [...photos];
+    const [moved] = nextPhotos.splice(fromIndex, 1);
+    nextPhotos.splice(toIndex, 0, moved);
+
+    const nextClassData: ClassData = {
+      ...classData,
+      [groupName]: nextPhotos,
+    };
+    setClassData(nextClassData);
+    void persistSlideshow(nextClassData);
+  };
+
   const removePhotoFromGroup = (groupName: string, photoIndex: number) => {
     const photos = classData[groupName] ?? [];
     const photo = photos[photoIndex];
@@ -1203,6 +1220,7 @@ const normalizeLoadedClassData = (loaded: any) => {
           onAutoSave={handleAutoSave}
           classes={classes}
           onMovePhotoToGroup={movePhotoToGroup}
+          onReorderPhotoInGroup={reorderPhotoInGroup}
           onRemovePhotoFromGroup={removePhotoFromGroup}
         />
       );
