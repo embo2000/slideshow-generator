@@ -28,28 +28,29 @@ export const dedupeClassDataByAssetId = (
   classData: ClassData,
   getAssetId: (file: File) => string | undefined
 ): ClassData => {
-  const seen = new Set<string>();
-  const deduped: ClassData = {};
+  const assignmentById = new Map<string, { file: File; groupName: string }>();
+
+  const recordGroup = (groupName: string, photos: File[]) => {
+    for (const file of photos) {
+      const assetId = getAssetId(file);
+      if (!assetId) continue;
+      assignmentById.set(assetId, { file, groupName });
+    }
+  };
 
   for (const groupName of classes) {
-    deduped[groupName] = (classData[groupName] ?? []).filter((file) => {
-      const assetId = getAssetId(file);
-      if (!assetId) return true;
-      if (seen.has(assetId)) return false;
-      seen.add(assetId);
-      return true;
-    });
+    recordGroup(groupName, classData[groupName] ?? []);
   }
 
   for (const [groupName, photos] of Object.entries(classData)) {
     if (classes.includes(groupName)) continue;
-    deduped[groupName] = photos.filter((file) => {
-      const assetId = getAssetId(file);
-      if (!assetId) return true;
-      if (seen.has(assetId)) return false;
-      seen.add(assetId);
-      return true;
-    });
+    recordGroup(groupName, photos);
+  }
+
+  const deduped: ClassData = Object.fromEntries(classes.map((groupName) => [groupName, []]));
+  for (const { file, groupName } of assignmentById.values()) {
+    if (!deduped[groupName]) deduped[groupName] = [];
+    deduped[groupName].push(file);
   }
 
   return deduped;

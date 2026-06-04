@@ -99,6 +99,8 @@ function App() {
   const stepAutoSaveInProgressRef = useRef(false);
   const stepAutoSaveQueuedRef = useRef(false);
   const contentAutoSaveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const slideshowHydratingRef = useRef(false);
+  const slideshowHydrateCooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const triggerStepAutoSaveRef = useRef<(() => void) | null>(null);
   const uploadedPhotoAssetsRef = useRef<WeakMap<File, StoredFile>>(new WeakMap());
   const uploadingPhotoAssetsRef = useRef<WeakMap<File, Promise<StoredFile>>>(new WeakMap());
@@ -517,6 +519,10 @@ const handleLoadSlideshow = (data: {
     : DEFAULT_CLASSES;
 
   console.log('slideshowClasses:', slideshowClasses);
+
+  beginSlideshowHydration();
+  uploadedPhotoAssetsRef.current = new WeakMap();
+  uploadingPhotoAssetsRef.current = new WeakMap();
   
   // Convert loaded data back to File objects
   const processLoadedData = async () => {
@@ -615,6 +621,11 @@ const handleLoadSlideshow = (data: {
       (file) => uploadedPhotoAssetsRef.current.get(file)?.id
     );
 
+    const normalizedClassData: ClassData = {};
+    slideshowClasses.forEach((className) => {
+      normalizedClassData[className] = processedClassData[className] ?? [];
+    });
+
     // Handle background option loading
     let loadedBackgroundOption: BackgroundOption = { type: 'none' };
     if (data.backgroundOption) {
@@ -639,9 +650,9 @@ const handleLoadSlideshow = (data: {
       console.log('Using background music from Drive');
     }
 
-    console.log('Final processed class data:', Object.keys(processedClassData));
-    console.log('Total photos loaded:', Object.values(processedClassData).reduce((total, photos) => total + photos.length, 0));
-    setClassData(processedClassData);
+    console.log('Final processed class data:', Object.keys(normalizedClassData));
+    console.log('Total photos loaded:', Object.values(normalizedClassData).reduce((total, photos) => total + photos.length, 0));
+    setClassData(normalizedClassData);
     setSelectedMusic(loadedSelectedMusic ?? null);
     setBackgroundOption(loadedBackgroundOption);
     setSelectedTransition(data.selectedTransition ?? TRANSITION_TYPES[0]);
@@ -659,9 +670,13 @@ const handleLoadSlideshow = (data: {
     setLoadedSlideshowLabel(data.slideshowName ?? (data as any).name ?? null);
     setClasses(slideshowClasses);
     setCurrentStep(0);
+    endSlideshowHydration();
   };
   
-  processLoadedData().catch(console.error);
+  processLoadedData().catch((error) => {
+    console.error('Failed to process loaded slideshow:', error);
+    endSlideshowHydration();
+  });
 };
 
 const handleLoadSlideshowOld = (data: {
@@ -849,10 +864,35 @@ const normalizeLoadedClassData = (loaded: any) => {
     await persistSlideshow(overrideClassData ?? classData);
   };
 
+  const beginSlideshowHydration = () => {
+    slideshowHydratingRef.current = true;
+    if (contentAutoSaveDebounceRef.current) {
+      clearTimeout(contentAutoSaveDebounceRef.current);
+      contentAutoSaveDebounceRef.current = null;
+    }
+    if (slideshowHydrateCooldownRef.current) {
+      clearTimeout(slideshowHydrateCooldownRef.current);
+      slideshowHydrateCooldownRef.current = null;
+    }
+  };
+
+  const endSlideshowHydration = () => {
+    if (slideshowHydrateCooldownRef.current) {
+      clearTimeout(slideshowHydrateCooldownRef.current);
+    }
+    slideshowHydrateCooldownRef.current = setTimeout(() => {
+      slideshowHydratingRef.current = false;
+      slideshowHydrateCooldownRef.current = null;
+    }, 2000);
+  };
+
   const persistSlideshow = async (
     dataToSave: ClassData,
     options?: { notifyOnSuccess?: boolean; successMessage?: string }
   ) => {
+    if (slideshowHydratingRef.current) {
+      return;
+    }
     if (!slideshowName.trim()) {
       return;
     }
@@ -929,6 +969,7 @@ const normalizeLoadedClassData = (loaded: any) => {
   // Without this, users who add images but never tap Next see nothing saved to the server.
   useEffect(() => {
     if (!currentUser) return;
+    if (slideshowHydratingRef.current) return;
     if (!slideshowName.trim()) return;
     const photoCount = Object.values(classData).reduce(
       (total, photos) => total + (photos && Array.isArray(photos) ? photos.length : 0),

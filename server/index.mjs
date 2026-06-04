@@ -87,6 +87,39 @@ const reconcileClassDataForSave = (existingClassData, incomingClassData) => {
   return merged;
 };
 
+const normalizeClassDataForClient = (classes, classData) => {
+  const groups = Array.isArray(classes) ? classes : [];
+  const source = classData && typeof classData === "object" ? classData : {};
+  const assignmentById = new Map();
+
+  const recordAssignments = (groupName, images) => {
+    if (!Array.isArray(images)) return;
+    for (const image of images) {
+      if (!image?.id) continue;
+      assignmentById.set(image.id, { image, groupName });
+    }
+  };
+
+  for (const groupName of groups) {
+    recordAssignments(groupName, source[groupName]);
+  }
+
+  for (const [groupName, images] of Object.entries(source)) {
+    if (groups.includes(groupName)) continue;
+    recordAssignments(groupName, images);
+  }
+
+  const normalized = Object.fromEntries(groups.map((groupName) => [groupName, []]));
+  for (const { image, groupName } of assignmentById.values()) {
+    if (!normalized[groupName]) normalized[groupName] = [];
+    if (normalized[groupName].length < MAX_PHOTOS_PER_GROUP) {
+      normalized[groupName].push(image);
+    }
+  }
+
+  return normalized;
+};
+
 const collectReferencedAssetIds = (classData) => {
   const ids = new Set();
   if (!classData || typeof classData !== "object") return ids;
@@ -1285,7 +1318,8 @@ app.get(`${apiPrefix}/slideshows/:id`, async (req, res) => {
     return res.status(404).json({ error: "Slideshow not found" });
   }
 
-  const classData = slideshow.classData || {};
+  const slideshowClasses = Array.isArray(slideshow.classes) ? slideshow.classes : [];
+  const classData = normalizeClassDataForClient(slideshowClasses, slideshow.classData || {});
   const classDataWithFreshUrls = {};
 
   for (const [groupName, images] of Object.entries(classData)) {
