@@ -3,6 +3,7 @@ import { Play, Edit, Music, Image as ImageIcon, Zap, Camera, Clock } from 'lucid
 import { ClassData, MusicTrack, BackgroundOption, TransitionType } from '../types';
 import WizardStepWrapper from './WizardStepWrapper';
 import PhotoThumbnail from './PhotoThumbnail';
+import { getClassesWithPhotosInOrder } from '../utils/classDataOrder';
 
 interface PreviewStepProps {
   classData: ClassData;
@@ -40,9 +41,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
     return Object.values(classData).reduce((total, photos) => total + photos.length, 0);
   };
 
-  const getClassesWithPhotos = () => {
-    return Object.entries(classData).filter(([_, photos]) => photos.length > 0);
-  };
+  const getClassesWithPhotos = () => getClassesWithPhotosInOrder(classes, classData);
 
   const getTotalDuration = () => {
     return Math.round((getTotalPhotos() * slideDuration) / 60 * 10) / 10; // Convert to minutes, round to 1 decimal
@@ -263,12 +262,12 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Photos by Image Group</h3>
           <div className="space-y-4">
-            {getClassesWithPhotos().map(([groupName, photos], groupIndex) => (
+            {getClassesWithPhotos().map(([groupName, photos]) => (
               <div key={groupName} className="bg-gray-50 p-4 rounded-lg">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-medium text-gray-900">{groupName}</h4>
                   <button
-                    onClick={() => onEdit(groupIndex)}
+                    onClick={() => onEdit(classes.indexOf(groupName))}
                     className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center space-x-1"
                   >
                     <Edit className="h-4 w-4" />

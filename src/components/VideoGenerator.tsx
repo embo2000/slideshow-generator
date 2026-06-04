@@ -2,9 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { X, Download, RotateCcw } from 'lucide-react';
 import { ClassData, MusicTrack, BackgroundOption, TransitionType } from '../types';
 import { backendService, StoredFile } from '../services/api';
+import { collectPhotosInClassOrder } from '../utils/classDataOrder';
 
 interface VideoGeneratorProps {
   classData: ClassData;
+  classes: string[];
   selectedMusic: MusicTrack | null;
   backgroundOption: BackgroundOption;
   selectedTransition: TransitionType;
@@ -44,6 +46,7 @@ const loadImageElement = (src: string): Promise<HTMLImageElement> =>
 
 const VideoGenerator: React.FC<VideoGeneratorProps> = ({
   classData,
+  classes,
   selectedMusic,
   backgroundOption,
   selectedTransition,
@@ -332,13 +335,8 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
       }
     }
 
-    // Collect all photos
-    const allPhotos: { file: File; className: string }[] = [];
-    Object.entries(classData).forEach(([className, photos]) => {
-      photos.forEach(photo => {
-        allPhotos.push({ file: photo, className });
-      });
-    });
+    // Collect all photos in wizard group order
+    const allPhotos = collectPhotosInClassOrder(classes, classData);
 
     if (allPhotos.length === 0) {
       setIsGenerating(false);

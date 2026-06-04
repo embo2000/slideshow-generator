@@ -1327,6 +1327,7 @@ const normalizeLoadedClassData = (loaded: any) => {
       {showVideoGenerator && (
         <VideoGenerator
           classData={classData}
+          classes={classes}
           selectedMusic={selectedMusic}
           backgroundOption={backgroundOption}
           selectedTransition={selectedTransition}
