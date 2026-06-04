@@ -25,6 +25,7 @@ export interface IntakeBootstrap {
     name: string;
     slideshowName: string;
     classes: string[];
+    groupPhotoCounts: Record<string, number>;
     updatedAt: string;
   }>;
 }

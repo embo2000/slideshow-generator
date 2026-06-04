@@ -1,6 +1,9 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { Upload, X, Image as ImageIcon, CheckCircle } from 'lucide-react';
 import WizardStepWrapper from './WizardStepWrapper';
+import PhotoPreviewModal from './PhotoPreviewModal';
+import PhotoThumbnail from './PhotoThumbnail';
+import { revokePhotoPreview } from '../utils/photoPreviewCache';
 
 interface ClassUploadStepProps {
   className: string;
@@ -19,6 +22,7 @@ const ClassUploadStep: React.FC<ClassUploadStepProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [activePreviewIndex, setActivePreviewIndex] = useState<number | null>(null);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -43,6 +47,7 @@ const ClassUploadStep: React.FC<ClassUploadStepProps> = ({
   };
 
   const removePhoto = (index: number) => {
+    revokePhotoPreview(photos[index]);
     const newPhotos = photos.filter((_, i) => i !== index);
     onPhotosUpdate(newPhotos);
   };
@@ -57,11 +62,6 @@ const ClassUploadStep: React.FC<ClassUploadStepProps> = ({
     setDragOver(false);
   };
 
-  const getPhotoSrc = (photo: File) => {
-    const previewUrl = (photo as File & { previewUrl?: string }).previewUrl;
-    return previewUrl || URL.createObjectURL(photo);
-  };
-
   return (
     <WizardStepWrapper
       title={`Upload Photos for ${className}`}
@@ -74,13 +74,24 @@ const ClassUploadStep: React.FC<ClassUploadStepProps> = ({
             <div key={index} className="relative aspect-square">
               {photos[index] ? (
                 <div className="relative group">
-                  <img
-                    src={getPhotoSrc(photos[index])}
-                    alt={`Photo ${index + 1}`}
-                    className="w-full h-full object-cover rounded-lg border-2 border-gray-200"
-                  />
                   <button
-                    onClick={() => removePhoto(index)}
+                    type="button"
+                    onClick={() => setActivePreviewIndex(index)}
+                    className="block w-full h-full rounded-lg overflow-hidden focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    title={`View photo ${index + 1}`}
+                  >
+                    <PhotoThumbnail
+                      file={photos[index]}
+                      alt={`Photo ${index + 1}`}
+                      className="w-full h-full object-cover border-2 border-gray-200 transition-transform duration-150 group-hover:scale-105"
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      removePhoto(index);
+                    }}
                     className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-sm"
                   >
                     <X className="h-3 w-3" />
@@ -145,6 +156,13 @@ const ClassUploadStep: React.FC<ClassUploadStepProps> = ({
           </div>
         )}
       </div>
+
+      {activePreviewIndex !== null && photos[activePreviewIndex] && (
+        <PhotoPreviewModal
+          file={photos[activePreviewIndex]}
+          onClose={() => setActivePreviewIndex(null)}
+        />
+      )}
     </WizardStepWrapper>
   );
 };

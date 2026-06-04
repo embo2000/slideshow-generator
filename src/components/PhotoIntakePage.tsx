@@ -1,7 +1,12 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Upload, ImagePlus, ExternalLink } from "lucide-react";
 import { backendService, IntakeBootstrap } from "../services/api";
 import { clearSharedPayload, readSharedPayload } from "../utils/shareTargetPayload";
+import { dedupeFiles } from "../utils/dedupeFiles";
+import { isSharedImageFile } from "../utils/sharedImageFiles";
+import PhotoPreviewModal from "./PhotoPreviewModal";
+import PhotoThumbnail from "./PhotoThumbnail";
+import { revokePhotoPreviews } from "../utils/photoPreviewCache";
 import { emitUploadSync } from "../utils/slideshowSync";
 import {
   clearDeferredInstallPrompt,
@@ -22,6 +27,14 @@ type SavedDestination = {
 };
 
 const destinationPreferenceKey = (token: string) => `intake-destination:${token}`;
+const MAX_PHOTOS_PER_GROUP = 5;
+
+const stripSharedPayloadFromUrl = () => {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("sharedPayload")) return;
+  url.searchParams.delete("sharedPayload");
+  window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+};
 
 const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
   const searchParams = useMemo(() => new URLSearchParams(window.location.search), []);
@@ -44,6 +57,7 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
   );
   const [showInstallHelp, setShowInstallHelp] = useState(false);
   const [activePreviewIndex, setActivePreviewIndex] = useState<number | null>(null);
+  const sharedPayloadImportedRef = useRef<string | null>(null);
 
   useEffect(() => {
     localStorage.setItem("default-intake-token", token);
@@ -161,42 +175,6 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
     run();
   }, [token]);
 
-  useEffect(() => {
-    if (!sharedPayloadId) return;
-
-    const importSharedFiles = async () => {
-      const sharedFiles = await readSharedPayload(sharedPayloadId);
-      if (sharedFiles.length === 0) {
-        return;
-      }
-
-      setFiles(sharedFiles);
-      setSuccess(
-        `Loaded ${sharedFiles.length} shared photo${sharedFiles.length === 1 ? "" : "s"} from Android Share.`
-      );
-      await clearSharedPayload(sharedPayloadId);
-    };
-
-    importSharedFiles().catch((error) => {
-      console.error("Failed to import shared photos:", error);
-    });
-  }, [sharedPayloadId]);
-
-  const previewItems = useMemo(
-    () =>
-      files.map((file) => ({
-        file,
-        url: URL.createObjectURL(file),
-      })),
-    [files]
-  );
-
-  useEffect(() => {
-    return () => {
-      previewItems.forEach((item) => URL.revokeObjectURL(item.url));
-    };
-  }, [previewItems]);
-
   const selectedExisting = useMemo(
     () => bootstrap?.slideshows.find((s) => s.id === existingSlideshowId) || null,
     [bootstrap, existingSlideshowId]
@@ -217,6 +195,80 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
       !!success?.toLowerCase().includes("shared photo")
     );
   }, [openSlideshowTargetId, uploadedSlideshowId, sharedPayloadId, files.length, success]);
+
+  const existingGroupPhotoCount = useMemo(() => {
+    if (mode !== "existing" || !existingSlideshowId || !selectedGroup) {
+      return 0;
+    }
+    const slideshow = bootstrap?.slideshows.find((item) => item.id === existingSlideshowId);
+    return slideshow?.groupPhotoCounts?.[selectedGroup] ?? 0;
+  }, [bootstrap, mode, existingSlideshowId, selectedGroup]);
+
+  const remainingPhotoSlots = Math.max(0, MAX_PHOTOS_PER_GROUP - existingGroupPhotoCount);
+
+  useEffect(() => {
+    if (!sharedPayloadId || isLoading || !bootstrap) return;
+    if (sharedPayloadImportedRef.current === sharedPayloadId) return;
+    sharedPayloadImportedRef.current = sharedPayloadId;
+
+    const importSharedFiles = async () => {
+      const sharedFiles = dedupeFiles(await readSharedPayload(sharedPayloadId));
+
+      if (sharedFiles.length === 0) {
+        stripSharedPayloadFromUrl();
+        setError(
+          "Shared photos could not be loaded. Close the app completely and try sharing again."
+        );
+        return;
+      }
+
+      if (remainingPhotoSlots === 0) {
+        stripSharedPayloadFromUrl();
+        await clearSharedPayload(sharedPayloadId);
+        setError(
+          `"${selectedGroup}" already has ${MAX_PHOTOS_PER_GROUP} photos. Choose a different group, then share the photo again.`
+        );
+        return;
+      }
+
+      const capped = sharedFiles.slice(0, remainingPhotoSlots);
+      setFiles(capped);
+      stripSharedPayloadFromUrl();
+      await clearSharedPayload(sharedPayloadId);
+
+      const messages = [
+        `Loaded ${capped.length} shared photo${capped.length === 1 ? "" : "s"}.`,
+      ];
+      if (sharedFiles.length > remainingPhotoSlots) {
+        messages.push(`Only ${remainingPhotoSlots} slot${remainingPhotoSlots === 1 ? "" : "s"} were available in this group.`);
+      }
+      setSuccess(messages.join(" "));
+    };
+
+    importSharedFiles().catch((error) => {
+      console.error("Failed to import shared photos:", error);
+      setError("Shared photos could not be loaded. Please try sharing again.");
+    });
+  }, [sharedPayloadId, isLoading, bootstrap, remainingPhotoSlots, selectedGroup]);
+
+  const applySelectedFiles = (incoming: File[]) => {
+    const images = dedupeFiles(incoming.filter(isSharedImageFile));
+    const capped = images.slice(0, remainingPhotoSlots);
+    setFiles(capped);
+
+    const skippedDuplicates = incoming.length - images.length;
+    const skippedForLimit = images.length - capped.length;
+    if (skippedDuplicates > 0 || skippedForLimit > 0) {
+      const messages: string[] = [];
+      if (skippedDuplicates > 0) {
+        messages.push(`${skippedDuplicates} duplicate photo${skippedDuplicates === 1 ? "" : "s"} were skipped.`);
+      }
+      if (skippedForLimit > 0) {
+        messages.push(`Only ${remainingPhotoSlots} photo slot${remainingPhotoSlots === 1 ? "" : "s"} remain in this group.`);
+      }
+      setSuccess(messages.join(" "));
+    }
+  };
 
   const availableGroups = useMemo(() => {
     if (!bootstrap) return [];
@@ -252,8 +304,8 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
   }, [bootstrap, mode, existingSlideshowId, selectedGroup]);
 
   const onFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const picked = Array.from(event.target.files || []).filter((f) => f.type.startsWith("image/"));
-    setFiles(picked);
+    applySelectedFiles(Array.from(event.target.files || []));
+    event.target.value = "";
   };
 
   const submit = async () => {
@@ -264,6 +316,14 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
     }
     if (files.length === 0) {
       setError("Please choose at least one image.");
+      return;
+    }
+    if (remainingPhotoSlots === 0) {
+      setError(`This group already has the maximum of ${MAX_PHOTOS_PER_GROUP} photos.`);
+      return;
+    }
+    if (files.length > remainingPhotoSlots) {
+      setError(`This group only has room for ${remainingPhotoSlots} more photo${remainingPhotoSlots === 1 ? "" : "s"}.`);
       return;
     }
 
@@ -312,11 +372,14 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
         `Uploaded ${result.uploadedCount} photo${result.uploadedCount === 1 ? "" : "s"} to "${slideshowLabel}" → "${selectedGroup}".`
       );
       setUploadedSlideshowId(slideshowId);
+      revokePhotoPreviews(files);
       setFiles([]);
       setNewSlideshowName("");
+
+      const refreshed = await backendService.intakeBootstrap(token);
+      setBootstrap(refreshed);
+
       if (mode === "new") {
-        const refreshed = await backendService.intakeBootstrap(token);
-        setBootstrap(refreshed);
         const createdItem = refreshed.slideshows.find((s) => s.id === slideshowId);
         if (createdItem) {
           setMode("existing");
@@ -506,27 +569,51 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Photos</label>
-          <label className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center text-sm text-gray-600 cursor-pointer hover:border-teal-400">
+          {mode === "existing" && selectedGroup && (
+            <p className="text-xs text-gray-500 mb-2">
+              {existingGroupPhotoCount}/{MAX_PHOTOS_PER_GROUP} photos already in this group
+              {remainingPhotoSlots > 0
+                ? ` · ${remainingPhotoSlots} slot${remainingPhotoSlots === 1 ? "" : "s"} available`
+                : " · group is full"}
+            </p>
+          )}
+          <label
+            className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center text-sm cursor-pointer ${
+              remainingPhotoSlots === 0
+                ? "border-gray-200 text-gray-400 cursor-not-allowed"
+                : "border-gray-300 text-gray-600 hover:border-teal-400"
+            }`}
+          >
             <ImagePlus className="h-6 w-6 mb-2 text-teal-600" />
-            Choose images from your device
-            <input type="file" multiple accept="image/*" className="hidden" onChange={onFileChange} />
+            {remainingPhotoSlots === 0 ? "This group is full" : "Choose images from your device"}
+            <input
+              type="file"
+              multiple
+              accept="image/*"
+              className="hidden"
+              onChange={onFileChange}
+              disabled={remainingPhotoSlots === 0}
+            />
           </label>
           {files.length > 0 && (
-            <p className="text-sm text-gray-600 mt-2">{files.length} image{files.length === 1 ? "" : "s"} selected</p>
+            <p className="text-sm text-gray-600 mt-2">
+              {files.length} image{files.length === 1 ? "" : "s"} selected
+              {remainingPhotoSlots > 0 ? ` (up to ${remainingPhotoSlots} can be uploaded)` : ""}
+            </p>
           )}
-          {previewItems.length > 0 && (
+          {files.length > 0 && (
             <div className="mt-3 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-              {previewItems.map((item, index) => (
+              {files.map((file, index) => (
                 <button
-                  key={`${item.file.name}-${index}`}
+                  key={`${file.name}-${index}`}
                   type="button"
                   onClick={() => setActivePreviewIndex(index)}
                   className="group relative rounded-md overflow-hidden border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  title={`Preview ${item.file.name}`}
+                  title={`Preview ${file.name}`}
                 >
-                  <img
-                    src={item.url}
-                    alt={item.file.name}
+                  <PhotoThumbnail
+                    file={file}
+                    alt={file.name}
                     className="w-full h-20 object-cover transition-transform duration-150 group-hover:scale-105"
                   />
                 </button>
@@ -566,7 +653,7 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
           </button>
           <button
             onClick={submit}
-            disabled={isSubmitting}
+            disabled={isSubmitting || remainingPhotoSlots === 0 || files.length === 0}
             className="w-full inline-flex items-center justify-center px-4 py-3 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-medium disabled:opacity-50"
           >
             <Upload className="h-4 w-4 mr-2" />
@@ -575,36 +662,11 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
         </div>
       </div>
 
-      {activePreviewIndex !== null && previewItems[activePreviewIndex] && (
-        <div
-          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
-          onClick={() => setActivePreviewIndex(null)}
-        >
-          <div
-            className="bg-white rounded-xl shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-4 py-3 border-b">
-              <p className="text-sm font-medium text-gray-800 truncate pr-4">
-                {previewItems[activePreviewIndex].file.name}
-              </p>
-              <button
-                type="button"
-                onClick={() => setActivePreviewIndex(null)}
-                className="px-2 py-1 text-sm text-gray-600 hover:text-gray-900"
-              >
-                Close
-              </button>
-            </div>
-            <div className="bg-black flex items-center justify-center max-h-[80vh]">
-              <img
-                src={previewItems[activePreviewIndex].url}
-                alt={previewItems[activePreviewIndex].file.name}
-                className="max-w-full max-h-[80vh] object-contain"
-              />
-            </div>
-          </div>
-        </div>
+      {activePreviewIndex !== null && files[activePreviewIndex] && (
+        <PhotoPreviewModal
+          file={files[activePreviewIndex]}
+          onClose={() => setActivePreviewIndex(null)}
+        />
       )}
     </div>
   );

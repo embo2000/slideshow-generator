@@ -1,5 +1,8 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { Upload, X, Image as ImageIcon } from 'lucide-react';
+import PhotoPreviewModal from './PhotoPreviewModal';
+import PhotoThumbnail from './PhotoThumbnail';
+import { revokePhotoPreview } from '../utils/photoPreviewCache';
 
 interface ClassCardProps {
   className: string;
@@ -10,6 +13,7 @@ interface ClassCardProps {
 const ClassCard: React.FC<ClassCardProps> = ({ className, photos, onPhotosUpdate }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [activePreviewIndex, setActivePreviewIndex] = useState<number | null>(null);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -34,6 +38,7 @@ const ClassCard: React.FC<ClassCardProps> = ({ className, photos, onPhotosUpdate
   };
 
   const removePhoto = (index: number) => {
+    revokePhotoPreview(photos[index]);
     const newPhotos = photos.filter((_, i) => i !== index);
     onPhotosUpdate(newPhotos);
   };
@@ -77,13 +82,24 @@ const ClassCard: React.FC<ClassCardProps> = ({ className, photos, onPhotosUpdate
             <div key={index} className="relative aspect-square">
               {photos[index] ? (
                 <div className="relative group">
-                  <img
-                    src={URL.createObjectURL(photos[index])}
-                    alt={`Photo ${index + 1}`}
-                    className="w-full h-full object-cover rounded-lg"
-                  />
                   <button
-                    onClick={() => removePhoto(index)}
+                    type="button"
+                    onClick={() => setActivePreviewIndex(index)}
+                    className="block w-full h-full rounded-lg overflow-hidden focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    title={`View photo ${index + 1}`}
+                  >
+                    <PhotoThumbnail
+                      file={photos[index]}
+                      alt={`Photo ${index + 1}`}
+                      className="w-full h-full object-cover transition-transform duration-150 group-hover:scale-105"
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      removePhoto(index);
+                    }}
                     className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-sm"
                   >
                     <X className="h-3 w-3" />
@@ -134,6 +150,13 @@ const ClassCard: React.FC<ClassCardProps> = ({ className, photos, onPhotosUpdate
           </div>
         </div>
       </div>
+
+      {activePreviewIndex !== null && photos[activePreviewIndex] && (
+        <PhotoPreviewModal
+          file={photos[activePreviewIndex]}
+          onClose={() => setActivePreviewIndex(null)}
+        />
+      )}
     </div>
   );
 };

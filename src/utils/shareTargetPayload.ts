@@ -1,5 +1,9 @@
-const SHARE_PAYLOAD_CACHE = "share-target-payload-v1";
-const META_PATH_PREFIX = "/share-target-payload/";
+import { dedupeFiles } from "./dedupeFiles";
+import {
+  SHARE_PAYLOAD_CACHE,
+  sharePayloadFileRequest,
+  sharePayloadMetaRequest,
+} from "./sharedImageFiles";
 
 export interface SharedPayloadMeta {
   id: string;
@@ -7,15 +11,12 @@ export interface SharedPayloadMeta {
   createdAt: string;
 }
 
-const metaRequest = (id: string) => new Request(`${META_PATH_PREFIX}${id}/meta`);
-const fileRequest = (id: string, index: number) =>
-  new Request(`${META_PATH_PREFIX}${id}/file/${index}`);
-
 export const readSharedPayload = async (id: string): Promise<File[]> => {
   if (!("caches" in window)) return [];
 
+  const origin = window.location.origin;
   const cache = await caches.open(SHARE_PAYLOAD_CACHE);
-  const metaResponse = await cache.match(metaRequest(id));
+  const metaResponse = await cache.match(sharePayloadMetaRequest(id, origin));
   if (!metaResponse) return [];
 
   let meta: SharedPayloadMeta | null = null;
@@ -27,7 +28,7 @@ export const readSharedPayload = async (id: string): Promise<File[]> => {
 
   const files: File[] = [];
   for (let index = 0; index < meta.fileCount; index += 1) {
-    const response = await cache.match(fileRequest(id, index));
+    const response = await cache.match(sharePayloadFileRequest(id, index, origin));
     if (!response) continue;
 
     const blob = await response.blob();
@@ -37,27 +38,27 @@ export const readSharedPayload = async (id: string): Promise<File[]> => {
     files.push(new File([blob], fileName, { type: fileType }));
   }
 
-  return files;
+  return dedupeFiles(files);
 };
 
 export const clearSharedPayload = async (id: string): Promise<void> => {
   if (!("caches" in window)) return;
-  const cache = await caches.open(SHARE_PAYLOAD_CACHE);
 
-  const metaResponse = await cache.match(metaRequest(id));
+  const origin = window.location.origin;
+  const cache = await caches.open(SHARE_PAYLOAD_CACHE);
+  const metaResponse = await cache.match(sharePayloadMetaRequest(id, origin));
   if (!metaResponse) return;
 
   let meta: SharedPayloadMeta | null = null;
   try {
     meta = (await metaResponse.json()) as SharedPayloadMeta;
   } catch {
-    // If metadata is malformed, at least clear the meta key.
-    await cache.delete(metaRequest(id));
+    await cache.delete(sharePayloadMetaRequest(id, origin));
     return;
   }
 
-  await cache.delete(metaRequest(id));
+  await cache.delete(sharePayloadMetaRequest(id, origin));
   for (let index = 0; index < meta.fileCount; index += 1) {
-    await cache.delete(fileRequest(id, index));
+    await cache.delete(sharePayloadFileRequest(id, index, origin));
   }
 };

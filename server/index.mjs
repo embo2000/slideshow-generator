@@ -17,6 +17,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const app = express();
 const prisma = new PrismaClient();
+const MAX_PHOTOS_PER_GROUP = 5;
 
 const requiredEnv = [
   "DATABASE_URL",
@@ -513,6 +514,7 @@ app.get(`${apiPrefix}/intake/:token/bootstrap`, async (req, res) => {
       name: true,
       slideshowName: true,
       classes: true,
+      classData: true,
       updatedAt: true,
     },
   });
@@ -520,13 +522,26 @@ app.get(`${apiPrefix}/intake/:token/bootstrap`, async (req, res) => {
   res.json({
     tokenId: uploadLink.id,
     defaultClasses,
-    slideshows: slideshows.map((item) => ({
-      id: item.id,
-      name: item.name,
-      slideshowName: item.slideshowName,
-      classes: Array.isArray(item.classes) ? item.classes : [],
-      updatedAt: item.updatedAt.toISOString(),
-    })),
+    slideshows: slideshows.map((item) => {
+      const classData =
+        item.classData && typeof item.classData === "object" ? item.classData : {};
+      const classes = Array.isArray(item.classes) ? item.classes : [];
+      const groupPhotoCounts = Object.fromEntries(
+        classes.map((group) => [
+          group,
+          Array.isArray(classData[group]) ? classData[group].length : 0,
+        ])
+      );
+
+      return {
+        id: item.id,
+        name: item.name,
+        slideshowName: item.slideshowName,
+        classes,
+        groupPhotoCounts,
+        updatedAt: item.updatedAt.toISOString(),
+      };
+    }),
   });
 });
 
@@ -633,11 +648,43 @@ app.post(`${apiPrefix}/intake/:token/upload`, intakeUpload.array("files", 20), a
     return res.status(400).json({ error: "Selected group does not exist in slideshow" });
   }
 
-  const uploadedItems = [];
+  const classData =
+    slideshow.classData && typeof slideshow.classData === "object"
+      ? { ...slideshow.classData }
+      : {};
+  const existingGroupItems = Array.isArray(classData[groupName]) ? classData[groupName] : [];
+  const remainingSlots = MAX_PHOTOS_PER_GROUP - existingGroupItems.length;
+
+  if (remainingSlots <= 0) {
+    return res.status(400).json({
+      error: `This group already has the maximum of ${MAX_PHOTOS_PER_GROUP} photos.`,
+    });
+  }
+
+  const seenIncoming = new Set();
+  const uniqueImageFiles = [];
   for (const file of files) {
     if (!file.mimetype?.startsWith("image/")) {
       continue;
     }
+    const dedupeKey = `${file.originalname}:${file.size}`;
+    if (seenIncoming.has(dedupeKey)) {
+      continue;
+    }
+    seenIncoming.add(dedupeKey);
+    uniqueImageFiles.push(file);
+  }
+
+  if (uniqueImageFiles.length === 0) {
+    return res.status(400).json({ error: "No valid image files found" });
+  }
+
+  const filesToUpload = uniqueImageFiles.slice(0, remainingSlots);
+  const skippedForLimit = uniqueImageFiles.length - filesToUpload.length;
+  const skippedDuplicates = files.length - uniqueImageFiles.length;
+
+  const uploadedItems = [];
+  for (const file of filesToUpload) {
 
     const objectKey = `photo/${Date.now()}-${crypto.randomUUID()}-${normalizeName(file.originalname)}`;
 
@@ -693,10 +740,7 @@ app.post(`${apiPrefix}/intake/:token/upload`, intakeUpload.array("files", 20), a
   }
 
   try {
-    const classData = slideshow.classData && typeof slideshow.classData === "object"
-      ? { ...slideshow.classData }
-      : {};
-    const groupItems = Array.isArray(classData[groupName]) ? [...classData[groupName]] : [];
+    const groupItems = [...existingGroupItems];
     groupItems.push(...uploadedItems);
     classData[groupName] = groupItems;
 
@@ -713,6 +757,9 @@ app.post(`${apiPrefix}/intake/:token/upload`, intakeUpload.array("files", 20), a
     slideshowId: slideshow.id,
     groupName,
     uploadedCount: uploadedItems.length,
+    skippedDuplicates,
+    skippedForLimit,
+    groupPhotoCount: existingGroupItems.length + uploadedItems.length,
     uploadedItems,
   });
 });

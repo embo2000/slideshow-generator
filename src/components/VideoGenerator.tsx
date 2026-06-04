@@ -457,6 +457,8 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
     // Animation parameters
     const photoDuration = slideDuration * 1000; // Convert seconds to milliseconds
     const totalDuration = loadedPhotos.length * photoDuration;
+    const endHoldDuration = 750; // Hold the final frame so the recorder flushes cleanly
+    const recordingStopTime = totalDuration + endHoldDuration;
     const fadeOutDuration = 2000; // 2 seconds fade out
     const fadeOutStartTime = totalDuration - fadeOutDuration;
     const startTime = Date.now();
@@ -464,7 +466,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
 
     const animate = async () => {
       const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / totalDuration, 1);
+      const progress = Math.min(elapsed / recordingStopTime, 1);
       setProgress(5 + progress * 95);
 
       // Handle music fade out
@@ -479,15 +481,22 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
         }
       }
       
-      if (progress >= 1) {
-        mediaRecorder.stop();
+      if (elapsed >= recordingStopTime) {
+        if (mediaRecorder.state === 'recording') {
+          mediaRecorder.requestData();
+          mediaRecorder.stop();
+        }
         return;
       }
 
-      const currentPhotoIndex = Math.floor((elapsed / photoDuration) % loadedPhotos.length);
+      const currentPhotoIndex = Math.min(
+        Math.floor(elapsed / photoDuration),
+        loadedPhotos.length - 1
+      );
       const currentPhoto = loadedPhotos[currentPhotoIndex];
-      const photoProgress = (elapsed % photoDuration) / photoDuration;
-      const nextPhotoIndex = (currentPhotoIndex + 1) % loadedPhotos.length;
+      const photoElapsed = elapsed - currentPhotoIndex * photoDuration;
+      const photoProgress = Math.min(photoElapsed / photoDuration, 1);
+      const isLastPhoto = currentPhotoIndex === loadedPhotos.length - 1;
 
       // Clear canvas and draw background
       if (backgroundImg) {
@@ -544,7 +553,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
 
       // Get current and next images
       const currentImg = currentPhoto.image;
-      const nextImg = loadedPhotos[nextPhotoIndex]?.image;
+      const nextImg = isLastPhoto ? null : loadedPhotos[currentPhotoIndex + 1]?.image ?? null;
 
       if (currentImg) {
         // Calculate dimensions to fit image while maintaining aspect ratio

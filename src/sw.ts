@@ -2,6 +2,13 @@
 
 import { clientsClaim } from "workbox-core";
 import { precacheAndRoute } from "workbox-precaching";
+import { dedupeFiles } from "./utils/dedupeFiles";
+import {
+  collectSharedImageFiles,
+  SHARE_PAYLOAD_CACHE,
+  sharePayloadFileRequest,
+  sharePayloadMetaRequest,
+} from "./utils/sharedImageFiles";
 
 declare let self: ServiceWorkerGlobalScope;
 declare global {
@@ -12,13 +19,6 @@ declare global {
     }>;
   }
 }
-
-const SHARE_PAYLOAD_CACHE = "share-target-payload-v1";
-const META_PATH_PREFIX = "/share-target-payload/";
-
-const metaRequest = (id: string) => new Request(`${META_PATH_PREFIX}${id}/meta`);
-const fileRequest = (id: string, index: number) =>
-  new Request(`${META_PATH_PREFIX}${id}/file/${index}`);
 
 self.skipWaiting();
 clientsClaim();
@@ -35,10 +35,7 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     (async () => {
       const formData = await request.formData();
-      const sharedFiles = formData
-        .getAll("files")
-        .filter((entry): entry is File => entry instanceof File)
-        .filter((file) => file.type.startsWith("image/"));
+      const sharedFiles = dedupeFiles(collectSharedImageFiles(formData));
 
       if (sharedFiles.length === 0) {
         return Response.redirect("/share-target?error=no-images", 303);
@@ -46,10 +43,11 @@ self.addEventListener("fetch", (event) => {
 
       const payloadId = crypto.randomUUID();
       const cache = await caches.open(SHARE_PAYLOAD_CACHE);
+      const origin = self.location.origin;
       const createdAt = new Date().toISOString();
 
       await cache.put(
-        metaRequest(payloadId),
+        sharePayloadMetaRequest(payloadId, origin),
         new Response(
           JSON.stringify({
             id: payloadId,
@@ -66,11 +64,16 @@ self.addEventListener("fetch", (event) => {
 
       await Promise.all(
         sharedFiles.map(async (file, index) => {
+          const contentType =
+            file.type && file.type.startsWith("image/")
+              ? file.type
+              : "image/jpeg";
+
           await cache.put(
-            fileRequest(payloadId, index),
+            sharePayloadFileRequest(payloadId, index, origin),
             new Response(file, {
               headers: {
-                "Content-Type": file.type || "application/octet-stream",
+                "Content-Type": contentType,
                 "X-File-Name": encodeURIComponent(file.name || `shared-image-${index + 1}`),
               },
             })

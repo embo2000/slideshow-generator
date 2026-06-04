@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Play, Edit, Music, Image as ImageIcon, Zap, Camera, Clock } from 'lucide-react';
 import { ClassData, MusicTrack, BackgroundOption, TransitionType } from '../types';
 import WizardStepWrapper from './WizardStepWrapper';
+import PhotoThumbnail from './PhotoThumbnail';
 
 interface PreviewStepProps {
   classData: ClassData;
@@ -45,11 +46,6 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
 
   const getTotalDuration = () => {
     return Math.round((getTotalPhotos() * slideDuration) / 60 * 10) / 10; // Convert to minutes, round to 1 decimal
-  };
-
-  const getPhotoSrc = (photo: File) => {
-    const previewUrl = (photo as File & { previewUrl?: string }).previewUrl;
-    return previewUrl || URL.createObjectURL(photo);
   };
 
   // Auto-save when slideshow name changes (with debouncing)
@@ -281,9 +277,9 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
                 </div>
                 <div className="grid grid-cols-5 gap-2">
                   {photos.map((photo, index) => (
-                    <img
+                    <PhotoThumbnail
                       key={index}
-                      src={getPhotoSrc(photo)}
+                      file={photo}
                       alt={`${groupName} photo ${index + 1}`}
                       className="w-full aspect-square object-cover rounded border"
                     />
