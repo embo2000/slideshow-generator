@@ -22,3 +22,35 @@ export const collectPhotosInClassOrder = (
   }
   return photos;
 };
+
+export const dedupeClassDataByAssetId = (
+  classes: string[],
+  classData: ClassData,
+  getAssetId: (file: File) => string | undefined
+): ClassData => {
+  const seen = new Set<string>();
+  const deduped: ClassData = {};
+
+  for (const groupName of classes) {
+    deduped[groupName] = (classData[groupName] ?? []).filter((file) => {
+      const assetId = getAssetId(file);
+      if (!assetId) return true;
+      if (seen.has(assetId)) return false;
+      seen.add(assetId);
+      return true;
+    });
+  }
+
+  for (const [groupName, photos] of Object.entries(classData)) {
+    if (classes.includes(groupName)) continue;
+    deduped[groupName] = photos.filter((file) => {
+      const assetId = getAssetId(file);
+      if (!assetId) return true;
+      if (seen.has(assetId)) return false;
+      seen.add(assetId);
+      return true;
+    });
+  }
+
+  return deduped;
+};

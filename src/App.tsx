@@ -16,6 +16,7 @@ import { backendService, StoredFile } from './services/api';
 import { ClassData, MusicTrack, BackgroundOption, TransitionType } from './types';
 import { useDialog } from './components/ui/DialogProvider';
 import { subscribeUploadSync } from './utils/slideshowSync';
+import { dedupeClassDataByAssetId } from './utils/classDataOrder';
 
 const TRANSITION_TYPES: TransitionType[] = [
   { id: 'fade', name: 'Fade', description: 'Smooth fade between images' },
@@ -194,11 +195,13 @@ function App() {
       return false;
     }
 
-    setClassData((prev) => ({
-      ...prev,
+    const nextClassData: ClassData = {
+      ...classData,
       [fromGroup]: sourcePhotos.filter((_, index) => index !== photoIndex),
-      [toGroup]: [...(prev[toGroup] ?? []), photo],
-    }));
+      [toGroup]: [...targetPhotos, photo],
+    };
+    setClassData(nextClassData);
+    void persistSlideshow(nextClassData, { notifyOnSuccess: true, successMessage: 'Photo moved and saved.' });
     return true;
   };
 
@@ -571,6 +574,12 @@ const handleLoadSlideshow = (data: {
       if (!processedClassData[className]) processedClassData[className] = [];
     });
 
+    processedClassData = dedupeClassDataByAssetId(
+      slideshowClasses,
+      processedClassData,
+      (file) => uploadedPhotoAssetsRef.current.get(file)?.id
+    );
+
     // Handle background option loading
     let loadedBackgroundOption: BackgroundOption = { type: 'none' };
     if (data.backgroundOption) {
@@ -801,16 +810,29 @@ const normalizeLoadedClassData = (loaded: any) => {
     triggerStepAutoSave();
   };
 
-  const handleAutoSave = async () => {
+  const handleAutoSave = async (overrideClassData?: ClassData) => {
+    await persistSlideshow(overrideClassData ?? classData);
+  };
+
+  const persistSlideshow = async (
+    dataToSave: ClassData,
+    options?: { notifyOnSuccess?: boolean; successMessage?: string }
+  ) => {
     if (!slideshowName.trim()) {
       return;
     }
+
+    const photoCount = Object.values(dataToSave).reduce(
+      (total, photos) => total + (photos && Array.isArray(photos) ? photos.length : 0),
+      0
+    );
+
     // Never overwrite a saved slideshow's photos when local state has none loaded yet.
-    if (getTotalPhotos() === 0 && currentSlideshowId) {
+    if (photoCount === 0 && currentSlideshowId) {
       return;
     }
     // Prevent accidental overwrite of an existing slideshow name with an empty wizard state.
-    if (!hasSlideshowContent()) {
+    if (photoCount === 0 && selectedMusic === null && backgroundOption.type === 'none') {
       return;
     }
 
@@ -818,7 +840,7 @@ const normalizeLoadedClassData = (loaded: any) => {
       const saved = await backendService.saveSlideshow({
         id: currentSlideshowId,
         name: slideshowName,
-        classData,
+        classData: dataToSave,
         selectedMusic,
         backgroundOption,
         selectedTransition,
@@ -830,8 +852,12 @@ const normalizeLoadedClassData = (loaded: any) => {
       setCurrentSlideshowId(saved.id);
       setLoadedSlideshowLabel(saved.name || slideshowName);
       console.log('Auto-save successful for:', slideshowName);
+      if (options?.notifyOnSuccess) {
+        toast(options.successMessage || 'Slideshow saved.', 'success');
+      }
     } catch (error) {
       console.error('Auto-save failed:', error);
+      toast('Could not save slideshow changes.', 'error');
       throw error;
     }
   };

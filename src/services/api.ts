@@ -186,11 +186,13 @@ const uploadAsset = async (
 
 const serializeClassData = async (
   classData: ClassData,
+  classes: string[],
   uploadedPhotoAssets?: WeakMap<File, StoredFile>
 ): Promise<Record<string, SerializedClassPhoto[]>> => {
   const result: Record<string, SerializedClassPhoto[]> = {};
 
-  for (const [className, files] of Object.entries(classData)) {
+  for (const className of classes) {
+    const files = classData[className] ?? [];
     result[className] = [];
     for (const file of files) {
       const uploadedFromCache = uploadedPhotoAssets?.get(file);
@@ -244,6 +246,7 @@ const saveSlideshow = async (params: {
 }): Promise<StoredSlideshow> => {
   const uploadedClassData = await serializeClassData(
     params.classData,
+    params.classes,
     params.uploadedPhotoAssets
   );
 

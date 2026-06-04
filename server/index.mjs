@@ -53,6 +53,40 @@ const mergeClassData = (existingClassData, incomingClassData) => {
   return merged;
 };
 
+const reconcileClassDataForSave = (existingClassData, incomingClassData) => {
+  const merged =
+    existingClassData && typeof existingClassData === "object" ? { ...existingClassData } : {};
+  const incomingPhotoIds = collectReferencedAssetIds(incomingClassData);
+
+  // Drop moved photos from their old groups before applying incoming assignments.
+  for (const [groupName, images] of Object.entries(merged)) {
+    if (!Array.isArray(images)) continue;
+    merged[groupName] = images.filter((image) => {
+      const id = image?.id;
+      return !id || !incomingPhotoIds.has(id);
+    });
+  }
+
+  for (const [groupName, incomingImages] of Object.entries(incomingClassData || {})) {
+    if (!Array.isArray(incomingImages)) continue;
+
+    const seen = new Set();
+    const next = [];
+    for (const image of incomingImages) {
+      const key = photoAssetKey(image);
+      if (key) {
+        if (seen.has(key)) continue;
+        seen.add(key);
+      }
+      next.push(image);
+    }
+
+    merged[groupName] = next.slice(0, MAX_PHOTOS_PER_GROUP);
+  }
+
+  return merged;
+};
+
 const collectReferencedAssetIds = (classData) => {
   const ids = new Set();
   if (!classData || typeof classData !== "object") return ids;
@@ -72,6 +106,8 @@ const countClassDataPhotos = (classData) => {
   }, 0);
 };
 
+const countUniqueClassDataPhotos = (classData) => collectReferencedAssetIds(classData).size;
+
 const resolveClassDataForSave = (existingSlideshow, incomingClassData) => {
   const existingData = existingSlideshow?.classData;
   const existingCount = countClassDataPhotos(existingData);
@@ -82,12 +118,14 @@ const resolveClassDataForSave = (existingSlideshow, incomingClassData) => {
   }
 
   const merged = existingSlideshow
-    ? mergeClassData(existingData, incomingClassData)
+    ? reconcileClassDataForSave(existingData, incomingClassData)
     : incomingClassData || {};
 
-  if (existingSlideshow && countClassDataPhotos(merged) < existingCount) {
+  const existingUniqueCount = countUniqueClassDataPhotos(existingData);
+  const mergedUniqueCount = countUniqueClassDataPhotos(merged);
+  if (existingSlideshow && mergedUniqueCount < existingUniqueCount) {
     console.warn(
-      `Blocked slideshow save that would reduce photos from ${existingCount} to ${countClassDataPhotos(merged)}`
+      `Blocked slideshow save that would reduce unique photos from ${existingUniqueCount} to ${mergedUniqueCount}`
     );
     return existingData;
   }
