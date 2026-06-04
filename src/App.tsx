@@ -17,6 +17,7 @@ import { ClassData, MusicTrack, BackgroundOption, TransitionType } from './types
 import { useDialog } from './components/ui/DialogProvider';
 import { subscribeUploadSync } from './utils/slideshowSync';
 import { dedupeClassDataByAssetId } from './utils/classDataOrder';
+import { revokePhotoPreview } from './utils/photoPreviewCache';
 
 const TRANSITION_TYPES: TransitionType[] = [
   { id: 'fade', name: 'Fade', description: 'Smooth fade between images' },
@@ -203,6 +204,23 @@ function App() {
     setClassData(nextClassData);
     void persistSlideshow(nextClassData, { notifyOnSuccess: true, successMessage: 'Photo moved and saved.' });
     return true;
+  };
+
+  const removePhotoFromGroup = (groupName: string, photoIndex: number) => {
+    const photos = classData[groupName] ?? [];
+    const photo = photos[photoIndex];
+    if (!photo) return;
+
+    revokePhotoPreview(photo);
+    const nextClassData: ClassData = {
+      ...classData,
+      [groupName]: photos.filter((_, index) => index !== photoIndex),
+    };
+    setClassData(nextClassData);
+    void persistSlideshow(nextClassData, {
+      notifyOnSuccess: true,
+      successMessage: 'Photo removed and saved.',
+    });
   };
 
   const groupPhotoCounts = Object.fromEntries(
@@ -1184,6 +1202,8 @@ const normalizeLoadedClassData = (loaded: any) => {
           onSlideshowNameChange={setSlideshowName}
           onAutoSave={handleAutoSave}
           classes={classes}
+          onMovePhotoToGroup={movePhotoToGroup}
+          onRemovePhotoFromGroup={removePhotoFromGroup}
         />
       );
     }

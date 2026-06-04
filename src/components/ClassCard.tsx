@@ -1,7 +1,8 @@
 import React, { useRef, useState, useCallback } from 'react';
-import { Upload, X, Image as ImageIcon } from 'lucide-react';
+import { Upload, Image as ImageIcon } from 'lucide-react';
 import PhotoPreviewModal from './PhotoPreviewModal';
 import PhotoThumbnail from './PhotoThumbnail';
+import PhotoThumbnailDeleteButton from './PhotoThumbnailDeleteButton';
 import { revokePhotoPreview } from '../utils/photoPreviewCache';
 
 interface ClassCardProps {
@@ -94,16 +95,7 @@ const ClassCard: React.FC<ClassCardProps> = ({ className, photos, onPhotosUpdate
                       className="w-full h-full object-cover transition-transform duration-150 group-hover:scale-105"
                     />
                   </button>
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      removePhoto(index);
-                    }}
-                    className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-sm"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
+                  <PhotoThumbnailDeleteButton onDelete={() => removePhoto(index)} />
                 </div>
               ) : (
                 <div className="w-full h-full border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">

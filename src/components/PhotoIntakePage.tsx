@@ -6,6 +6,7 @@ import { dedupeFiles } from "../utils/dedupeFiles";
 import { isSharedImageFile } from "../utils/sharedImageFiles";
 import PhotoPreviewModal from "./PhotoPreviewModal";
 import PhotoThumbnail from "./PhotoThumbnail";
+import PhotoThumbnailDeleteButton from "./PhotoThumbnailDeleteButton";
 import { revokePhotoPreviews, revokePhotoPreview } from "../utils/photoPreviewCache";
 import { emitUploadSync } from "../utils/slideshowSync";
 import {
@@ -615,19 +616,24 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
           {files.length > 0 && (
             <div className="mt-3 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
               {files.map((file, index) => (
-                <button
+                <div
                   key={`${file.name}-${index}`}
-                  type="button"
-                  onClick={() => setActivePreviewIndex(index)}
-                  className="group relative rounded-md overflow-hidden border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  title={`Preview ${file.name}`}
+                  className="group relative rounded-md overflow-hidden border border-gray-200 bg-gray-50"
                 >
-                  <PhotoThumbnail
-                    file={file}
-                    alt={file.name}
-                    className="w-full h-20 object-cover transition-transform duration-150 group-hover:scale-105"
-                  />
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setActivePreviewIndex(index)}
+                    className="block w-full focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    title={`Preview ${file.name}`}
+                  >
+                    <PhotoThumbnail
+                      file={file}
+                      alt={file.name}
+                      className="w-full h-20 object-cover transition-transform duration-150 group-hover:scale-105"
+                    />
+                  </button>
+                  <PhotoThumbnailDeleteButton onDelete={() => removePhoto(index)} />
+                </div>
               ))}
             </div>
           )}

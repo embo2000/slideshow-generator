@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { Play, Edit, Music, Image as ImageIcon, Zap, Camera, Clock } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Play, Edit, Music, Image as ImageIcon, Zap, Camera, Clock, GripVertical } from 'lucide-react';
 import { ClassData, MusicTrack, BackgroundOption, TransitionType } from '../types';
 import WizardStepWrapper from './WizardStepWrapper';
 import PhotoThumbnail from './PhotoThumbnail';
-import { getClassesWithPhotosInOrder } from '../utils/classDataOrder';
+import PhotoPreviewModal from './PhotoPreviewModal';
+import PhotoThumbnailDeleteButton from './PhotoThumbnailDeleteButton';
 
 interface PreviewStepProps {
   classData: ClassData;
@@ -18,7 +19,16 @@ interface PreviewStepProps {
   onSlideshowNameChange: (name: string) => void;
   onAutoSave?: () => Promise<void>;
   classes: string[];
+  onMovePhotoToGroup?: (fromGroup: string, photoIndex: number, toGroup: string) => boolean;
+  onRemovePhotoFromGroup?: (groupName: string, photoIndex: number) => void;
 }
+
+type DragPhotoPayload = {
+  fromGroup: string;
+  photoIndex: number;
+};
+
+const DRAG_PHOTO_MIME = 'application/x-slideshow-photo';
 
 const PreviewStep: React.FC<PreviewStepProps> = ({
   classData,
@@ -32,16 +42,88 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
   slideshowName,
   onSlideshowNameChange,
   onAutoSave,
-  classes
+  classes,
+  onMovePhotoToGroup,
+  onRemovePhotoFromGroup,
 }) => {
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [dropTargetGroup, setDropTargetGroup] = useState<string | null>(null);
+  const [draggingFromGroup, setDraggingFromGroup] = useState<string | null>(null);
+  const [activePreview, setActivePreview] = useState<{ groupName: string; index: number } | null>(null);
+  const dragSessionRef = useRef(false);
 
   const getTotalPhotos = () => {
     return Object.values(classData).reduce((total, photos) => total + photos.length, 0);
   };
 
-  const getClassesWithPhotos = () => getClassesWithPhotosInOrder(classes, classData);
+  const getClassesWithPhotos = () =>
+    classes.filter((groupName) => (classData[groupName] ?? []).length > 0);
+
+  const readDragPayload = (event: React.DragEvent): DragPhotoPayload | null => {
+    const raw = event.dataTransfer.getData(DRAG_PHOTO_MIME);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw) as DragPhotoPayload;
+      if (typeof parsed.fromGroup === 'string' && typeof parsed.photoIndex === 'number') {
+        return parsed;
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  };
+
+  const handlePhotoDragStart = (
+    event: React.DragEvent,
+    fromGroup: string,
+    photoIndex: number
+  ) => {
+    dragSessionRef.current = true;
+    event.dataTransfer.setData(
+      DRAG_PHOTO_MIME,
+      JSON.stringify({ fromGroup, photoIndex })
+    );
+    event.dataTransfer.effectAllowed = 'move';
+    setDraggingFromGroup(fromGroup);
+  };
+
+  const handlePhotoDragEnd = () => {
+    setDraggingFromGroup(null);
+    setDropTargetGroup(null);
+    window.setTimeout(() => {
+      dragSessionRef.current = false;
+    }, 0);
+  };
+
+  const handlePhotoClick = (groupName: string, photoIndex: number) => {
+    if (dragSessionRef.current) return;
+    setActivePreview({ groupName, index: photoIndex });
+  };
+
+  const groupPhotoCounts = Object.fromEntries(
+    classes.map((groupName) => [groupName, (classData[groupName] ?? []).length])
+  );
+
+  const handleGroupDragOver = (event: React.DragEvent, groupName: string) => {
+    if (!onMovePhotoToGroup) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    setDropTargetGroup(groupName);
+  };
+
+  const handleGroupDrop = (event: React.DragEvent, toGroup: string) => {
+    event.preventDefault();
+    setDropTargetGroup(null);
+    setDraggingFromGroup(null);
+    if (!onMovePhotoToGroup) return;
+
+    const payload = readDragPayload(event);
+    if (!payload) return;
+    if (payload.fromGroup === toGroup) return;
+
+    onMovePhotoToGroup(payload.fromGroup, payload.photoIndex, toGroup);
+  };
 
   const getTotalDuration = () => {
     return Math.round((getTotalPhotos() * slideDuration) / 60 * 10) / 10; // Convert to minutes, round to 1 decimal
@@ -260,32 +342,94 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
 
         {/* Class Photos Preview */}
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Photos by Image Group</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Photos by Image Group</h3>
+            {onMovePhotoToGroup && (
+              <p className="text-sm text-gray-500">Drag photos between groups to reorganize</p>
+            )}
+          </div>
           <div className="space-y-4">
-            {getClassesWithPhotos().map(([groupName, photos]) => (
-              <div key={groupName} className="bg-gray-50 p-4 rounded-lg">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-medium text-gray-900">{groupName}</h4>
-                  <button
-                    onClick={() => onEdit(classes.indexOf(groupName))}
-                    className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center space-x-1"
-                  >
-                    <Edit className="h-4 w-4" />
-                    <span>Edit</span>
-                  </button>
+            {classes.map((groupName) => {
+              const photos = classData[groupName] ?? [];
+              const isDropTarget = dropTargetGroup === groupName;
+              const isDraggingFromHere = draggingFromGroup === groupName;
+              const groupIsFull = photos.length >= 5;
+
+              return (
+                <div
+                  key={groupName}
+                  onDragOver={(event) => {
+                    if (groupIsFull && draggingFromGroup !== groupName) return;
+                    handleGroupDragOver(event, groupName);
+                  }}
+                  onDragLeave={() => {
+                    if (dropTargetGroup === groupName) setDropTargetGroup(null);
+                  }}
+                  onDrop={(event) => handleGroupDrop(event, groupName)}
+                  className={`bg-gray-50 p-4 rounded-lg transition-colors ${
+                    isDropTarget ? 'ring-2 ring-teal-500 bg-teal-50' : ''
+                  } ${isDraggingFromHere ? 'opacity-80' : ''}`}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h4 className="font-medium text-gray-900">{groupName}</h4>
+                      <p className="text-xs text-gray-500 mt-0.5">{photos.length}/5 photos</p>
+                    </div>
+                    <button
+                      onClick={() => onEdit(classes.indexOf(groupName))}
+                      className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center space-x-1"
+                    >
+                      <Edit className="h-4 w-4" />
+                      <span>Edit</span>
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-5 gap-2 min-h-[4.5rem]">
+                    {photos.map((photo, index) => (
+                      <div
+                        key={`${groupName}-${index}`}
+                        draggable={Boolean(onMovePhotoToGroup)}
+                        onDragStart={(event) => handlePhotoDragStart(event, groupName, index)}
+                        onDragEnd={handlePhotoDragEnd}
+                        onClick={() => handlePhotoClick(groupName, index)}
+                        className={`relative group rounded border overflow-hidden bg-white ${
+                          onMovePhotoToGroup ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
+                        }`}
+                        title="Click to view · drag to another group"
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            handlePhotoClick(groupName, index);
+                          }
+                        }}
+                      >
+                        <PhotoThumbnail
+                          file={photo}
+                          alt={`${groupName} photo ${index + 1}`}
+                          className="w-full aspect-square object-cover pointer-events-none"
+                        />
+                        {onMovePhotoToGroup && (
+                          <div className="absolute top-1 left-1 rounded bg-black/45 text-white p-0.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                            <GripVertical className="h-3 w-3" />
+                          </div>
+                        )}
+                        {onRemovePhotoFromGroup && (
+                          <PhotoThumbnailDeleteButton
+                            onDelete={() => onRemovePhotoFromGroup(groupName, index)}
+                          />
+                        )}
+                      </div>
+                    ))}
+                    {photos.length === 0 && onMovePhotoToGroup && (
+                      <div className="col-span-5 flex items-center justify-center rounded border-2 border-dashed border-gray-300 text-sm text-gray-400 min-h-[4.5rem]">
+                        Drop photos here
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="grid grid-cols-5 gap-2">
-                  {photos.map((photo, index) => (
-                    <PhotoThumbnail
-                      key={index}
-                      file={photo}
-                      alt={`${groupName} photo ${index + 1}`}
-                      className="w-full aspect-square object-cover rounded border"
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -303,6 +447,43 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
           </p>
         </div>
       </div>
+
+      {activePreview && (classData[activePreview.groupName] ?? [])[activePreview.index] && (
+        <PhotoPreviewModal
+          photos={classData[activePreview.groupName] ?? []}
+          activeIndex={activePreview.index}
+          onNavigate={(index) => setActivePreview({ groupName: activePreview.groupName, index })}
+          onClose={() => setActivePreview(null)}
+          onDelete={
+            onRemovePhotoFromGroup
+              ? () => {
+                  onRemovePhotoFromGroup(activePreview.groupName, activePreview.index);
+                  setActivePreview(null);
+                }
+              : undefined
+          }
+          moveGroups={classes.map((groupName) => ({
+            name: groupName,
+            photoCount: groupPhotoCounts[groupName] ?? 0,
+            isCurrent: groupName === activePreview.groupName,
+          }))}
+          onMoveToGroup={
+            onMovePhotoToGroup
+              ? (targetGroup) => {
+                  const moved = onMovePhotoToGroup(
+                    activePreview.groupName,
+                    activePreview.index,
+                    targetGroup
+                  );
+                  if (moved) {
+                    setActivePreview(null);
+                  }
+                  return moved;
+                }
+              : undefined
+          }
+        />
+      )}
     </WizardStepWrapper>
   );
 };
