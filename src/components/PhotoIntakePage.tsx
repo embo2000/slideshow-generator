@@ -675,7 +675,9 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
 
       {activePreviewIndex !== null && files[activePreviewIndex] && (
         <PhotoPreviewModal
-          file={files[activePreviewIndex]}
+          photos={files}
+          activeIndex={activePreviewIndex}
+          onNavigate={setActivePreviewIndex}
           onClose={() => setActivePreviewIndex(null)}
           onDelete={() => {
             removePhoto(activePreviewIndex);

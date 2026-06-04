@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Download, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Trash2 } from "lucide-react";
 import { usePhotoFullPreview } from "../hooks/usePhotoPreview";
 import { downloadPhotoFile } from "../utils/photoPreviewCache";
 
@@ -10,7 +10,9 @@ export interface MoveToGroupOption {
 }
 
 interface PhotoPreviewModalProps {
-  file: File;
+  photos: File[];
+  activeIndex: number;
+  onNavigate?: (index: number) => void;
   onClose: () => void;
   onDelete?: () => void;
   moveGroups?: MoveToGroupOption[];
@@ -18,31 +20,61 @@ interface PhotoPreviewModalProps {
 }
 
 const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
-  file,
+  photos,
+  activeIndex,
+  onNavigate,
   onClose,
   onDelete,
   moveGroups,
   onMoveToGroup,
 }) => {
+  const file = photos[activeIndex];
   const { src, loading } = usePhotoFullPreview(file, true);
-  const alt = file.name || "Photo preview";
+  const alt = file?.name || "Photo preview";
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [selectedGroup, setSelectedGroup] = useState("");
   const [moveError, setMoveError] = useState<string | null>(null);
 
+  const canNavigate = photos.length > 1 && onNavigate;
+  const hasPrevious = canNavigate && activeIndex > 0;
+  const hasNext = canNavigate && activeIndex < photos.length - 1;
+
   const availableTargets =
     moveGroups?.filter((group) => !group.isCurrent && group.photoCount < 5) ?? [];
+
+  const goPrevious = () => {
+    if (hasPrevious) onNavigate!(activeIndex - 1);
+  };
+
+  const goNext = () => {
+    if (hasNext) onNavigate!(activeIndex + 1);
+  };
+
+  useEffect(() => {
+    setDownloadError(null);
+    setMoveError(null);
+  }, [activeIndex]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         onClose();
+        return;
+      }
+      if (!onNavigate || photos.length <= 1) return;
+      if (event.key === "ArrowLeft" && activeIndex > 0) {
+        event.preventDefault();
+        onNavigate(activeIndex - 1);
+      }
+      if (event.key === "ArrowRight" && activeIndex < photos.length - 1) {
+        event.preventDefault();
+        onNavigate(activeIndex + 1);
       }
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
+  }, [activeIndex, onClose, onNavigate, photos.length]);
 
   useEffect(() => {
     if (availableTargets.length === 0) {
@@ -55,6 +87,7 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
   }, [availableTargets, selectedGroup]);
 
   const handleDownload = async () => {
+    if (!file) return;
     setDownloading(true);
     setDownloadError(null);
     try {
@@ -77,6 +110,10 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
     setMoveError("Could not move photo to that group.");
   };
 
+  if (!file) {
+    return null;
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
@@ -87,7 +124,14 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b gap-3">
-          <p className="text-sm font-medium text-gray-800 truncate min-w-0">{alt}</p>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-gray-800 truncate">{alt}</p>
+            {canNavigate && (
+              <p className="text-xs text-gray-500 mt-0.5">
+                Photo {activeIndex + 1} of {photos.length}
+              </p>
+            )}
+          </div>
           <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
             <button
               type="button"
@@ -119,11 +163,35 @@ const PhotoPreviewModal: React.FC<PhotoPreviewModalProps> = ({
             </button>
           </div>
         </div>
-        <div className="bg-black flex items-center justify-center min-h-[240px] max-h-[70vh] flex-1">
+        <div className="relative bg-black flex items-center justify-center min-h-[240px] max-h-[70vh] flex-1">
+          {canNavigate && (
+            <button
+              type="button"
+              onClick={goPrevious}
+              disabled={!hasPrevious}
+              className="absolute left-2 z-10 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Previous photo (←)"
+              aria-label="Previous photo"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
+          )}
           {loading || !src ? (
             <div className="w-16 h-16 rounded-full border-4 border-white/30 border-t-white animate-spin" />
           ) : (
             <img src={src} alt={alt} className="max-w-full max-h-[70vh] object-contain" decoding="async" />
+          )}
+          {canNavigate && (
+            <button
+              type="button"
+              onClick={goNext}
+              disabled={!hasNext}
+              className="absolute right-2 z-10 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Next photo (→)"
+              aria-label="Next photo"
+            >
+              <ChevronRight className="h-6 w-6" />
+            </button>
           )}
         </div>
         {moveGroups && onMoveToGroup && (
