@@ -155,6 +155,10 @@ const ClassCard: React.FC<ClassCardProps> = ({ className, photos, onPhotosUpdate
         <PhotoPreviewModal
           file={photos[activePreviewIndex]}
           onClose={() => setActivePreviewIndex(null)}
+          onDelete={() => {
+            removePhoto(activePreviewIndex);
+            setActivePreviewIndex(null);
+          }}
         />
       )}
     </div>

@@ -6,7 +6,7 @@ import { dedupeFiles } from "../utils/dedupeFiles";
 import { isSharedImageFile } from "../utils/sharedImageFiles";
 import PhotoPreviewModal from "./PhotoPreviewModal";
 import PhotoThumbnail from "./PhotoThumbnail";
-import { revokePhotoPreviews } from "../utils/photoPreviewCache";
+import { revokePhotoPreviews, revokePhotoPreview } from "../utils/photoPreviewCache";
 import { emitUploadSync } from "../utils/slideshowSync";
 import {
   clearDeferredInstallPrompt,
@@ -268,6 +268,11 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
       }
       setSuccess(messages.join(" "));
     }
+  };
+
+  const removePhoto = (index: number) => {
+    revokePhotoPreview(files[index]);
+    setFiles((current) => current.filter((_, i) => i !== index));
   };
 
   const availableGroups = useMemo(() => {
@@ -672,6 +677,10 @@ const PhotoIntakePage: React.FC<PhotoIntakePageProps> = ({ token }) => {
         <PhotoPreviewModal
           file={files[activePreviewIndex]}
           onClose={() => setActivePreviewIndex(null)}
+          onDelete={() => {
+            removePhoto(activePreviewIndex);
+            setActivePreviewIndex(null);
+          }}
         />
       )}
     </div>

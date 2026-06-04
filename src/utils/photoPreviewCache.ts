@@ -113,3 +113,44 @@ export const revokePhotoPreview = (file: File): void => {
 export const revokePhotoPreviews = (files: File[]): void => {
   files.forEach(revokePhotoPreview);
 };
+
+const resolveFetchUrl = (url: string): string => {
+  if (/^[a-z][a-z\d+\-.]*:/i.test(url)) {
+    return url;
+  }
+  return new URL(url, window.location.origin).href;
+};
+
+export const downloadPhotoFile = async (file: File): Promise<void> => {
+  const fullUrl = await getPhotoFullUrl(file);
+  let blob: Blob;
+
+  if (fullUrl.startsWith("blob:")) {
+    const response = await fetch(fullUrl);
+    blob = await response.blob();
+  } else if (file.size > 0 && !getRemoteUrl(file)) {
+    blob = file;
+  } else {
+    const response = await fetch(resolveFetchUrl(fullUrl));
+    if (!response.ok) {
+      throw new Error(`Download failed (${response.status})`);
+    }
+    blob = await response.blob();
+  }
+
+  const extFromType = blob.type.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
+  let filename = file.name?.trim() || `photo.${extFromType}`;
+  if (!/\.\w+$/.test(filename)) {
+    filename = `${filename}.${extFromType}`;
+  }
+
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  anchor.rel = "noopener";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
+};

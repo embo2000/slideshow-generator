@@ -52,6 +52,8 @@ function App() {
   const [slideDuration, setSlideDuration] = useState(3); // Default 3 seconds per slide
   const [loadedSlideshowLabel, setLoadedSlideshowLabel] = useState<string | null>(null);
   const [currentSlideshowId, setCurrentSlideshowId] = useState<string | null>(null);
+  const [recoverablePhotoCount, setRecoverablePhotoCount] = useState(0);
+  const [isRestoringPhotos, setIsRestoringPhotos] = useState(false);
   const [slideshowName, setSlideshowName] = useState(() => {
     const today = new Date();
     const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
@@ -178,6 +180,31 @@ function App() {
       }
     });
   };
+
+  const movePhotoToGroup = (fromGroup: string, photoIndex: number, toGroup: string): boolean => {
+    if (fromGroup === toGroup) return false;
+
+    const sourcePhotos = classData[fromGroup] ?? [];
+    const photo = sourcePhotos[photoIndex];
+    if (!photo) return false;
+
+    const targetPhotos = classData[toGroup] ?? [];
+    if (targetPhotos.length >= 5) {
+      toast('That group already has 5 photos.', 'error');
+      return false;
+    }
+
+    setClassData((prev) => ({
+      ...prev,
+      [fromGroup]: sourcePhotos.filter((_, index) => index !== photoIndex),
+      [toGroup]: [...(prev[toGroup] ?? []), photo],
+    }));
+    return true;
+  };
+
+  const groupPhotoCounts = Object.fromEntries(
+    classes.map((groupName) => [groupName, (classData[groupName] ?? []).length])
+  );
 
 const getTotalPhotos = () => {
   return Object.values(classData).reduce((total, photos) => 
@@ -778,6 +805,10 @@ const normalizeLoadedClassData = (loaded: any) => {
     if (!slideshowName.trim()) {
       return;
     }
+    // Never overwrite a saved slideshow's photos when local state has none loaded yet.
+    if (getTotalPhotos() === 0 && currentSlideshowId) {
+      return;
+    }
     // Prevent accidental overwrite of an existing slideshow name with an empty wizard state.
     if (!hasSlideshowContent()) {
       return;
@@ -845,6 +876,9 @@ const normalizeLoadedClassData = (loaded: any) => {
     if (photoCount === 0 && selectedMusic === null && backgroundOption.type === 'none') {
       return;
     }
+    if (photoCount === 0 && currentSlideshowId) {
+      return;
+    }
 
     if (contentAutoSaveDebounceRef.current) {
       clearTimeout(contentAutoSaveDebounceRef.current);
@@ -869,6 +903,7 @@ const normalizeLoadedClassData = (loaded: any) => {
     selectedTransition,
     classes,
     slideDuration,
+    currentSlideshowId,
   ]);
 
   const generateVideo = async () => {
@@ -1003,28 +1038,57 @@ const normalizeLoadedClassData = (loaded: any) => {
   }, [currentUser, currentSlideshowId, slideshowName, currentStep]);
 
   useEffect(() => {
-    if (!currentUser || !currentSlideshowId) return;
+    if (!currentUser || !currentSlideshowId || getTotalPhotos() > 0) {
+      setRecoverablePhotoCount(0);
+      return;
+    }
 
-    const reloadCurrentSlideshow = async () => {
-      try {
-        const previousStep = currentStep;
-        const refreshed = await backendService.loadSlideshow(currentSlideshowId);
-        handleLoadSlideshow(refreshed);
-        setCurrentStep(previousStep);
-      } catch (error) {
-        console.error('Failed to refresh slideshow after returning to app:', error);
-      }
+    let cancelled = false;
+    backendService
+      .getRecoverablePhotos(currentSlideshowId)
+      .then((result) => {
+        if (!cancelled) setRecoverablePhotoCount(result.count);
+      })
+      .catch(() => {
+        if (!cancelled) setRecoverablePhotoCount(0);
+      });
+
+    return () => {
+      cancelled = true;
     };
+  }, [currentUser, currentSlideshowId, classData]);
 
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        reloadCurrentSlideshow();
+  const handleRestorePhotos = async () => {
+    if (!currentSlideshowId || recoverablePhotoCount === 0) return;
+
+    const shouldRestore = await confirmDialog(
+      `Restore ${recoverablePhotoCount} photo${recoverablePhotoCount === 1 ? '' : 's'} from storage back into this slideshow? Photos will be placed across your image groups in upload order.`,
+      {
+        title: 'Restore Missing Photos',
+        confirmText: 'Restore Photos',
+        cancelText: 'Cancel',
       }
-    };
+    );
+    if (!shouldRestore) return;
 
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
-  }, [currentUser, currentSlideshowId, currentStep]);
+    setIsRestoringPhotos(true);
+    try {
+      const result = await backendService.restorePhotos(currentSlideshowId);
+      const refreshed = await backendService.loadSlideshow(currentSlideshowId);
+      handleLoadSlideshow(refreshed);
+      setRecoverablePhotoCount(0);
+      toast(
+        `Restored ${result.restoredCount} photo${result.restoredCount === 1 ? '' : 's'}.`,
+        'success'
+      );
+    } catch (error) {
+      console.error('Failed to restore photos:', error);
+      await alertDialog('Could not restore photos. Please try again.', { title: 'Restore Failed' });
+    } finally {
+      setIsRestoringPhotos(false);
+    }
+  };
+
   const renderCurrentStep = () => {
     if (currentStep < classes.length) {
       // Image group upload steps
@@ -1036,6 +1100,11 @@ const normalizeLoadedClassData = (loaded: any) => {
           onPhotosUpdate={(photos) => updateClassPhotos(groupName, photos)}
           stepNumber={currentStep + 1}
           totalClasses={classes.length}
+          allGroups={classes}
+          groupPhotoCounts={groupPhotoCounts}
+          onMovePhotoToGroup={(targetGroup, photoIndex) =>
+            movePhotoToGroup(groupName, photoIndex, targetGroup)
+          }
         />
       );
     } else if (currentStep === classes.length) {
@@ -1185,6 +1254,25 @@ const normalizeLoadedClassData = (loaded: any) => {
           </div>
         </div>
       </header>
+
+      {recoverablePhotoCount > 0 && (
+        <div className="bg-amber-50 border-b border-amber-200">
+          <div className="max-w-4xl mx-auto px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <p className="text-sm text-amber-900">
+              {recoverablePhotoCount} photo{recoverablePhotoCount === 1 ? '' : 's'} from this slideshow
+              are still in storage but missing from the editor.
+            </p>
+            <button
+              type="button"
+              onClick={handleRestorePhotos}
+              disabled={isRestoringPhotos}
+              className="shrink-0 px-4 py-2 text-sm font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-60"
+            >
+              {isRestoringPhotos ? 'Restoring…' : 'Restore Photos'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Wizard Progress */}
       <WizardProgress

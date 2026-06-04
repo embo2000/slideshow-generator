@@ -11,6 +11,9 @@ interface ClassUploadStepProps {
   onPhotosUpdate: (photos: File[]) => void;
   stepNumber: number;
   totalClasses: number;
+  allGroups?: string[];
+  groupPhotoCounts?: Record<string, number>;
+  onMovePhotoToGroup?: (targetGroup: string, photoIndex: number) => boolean;
 }
 
 const ClassUploadStep: React.FC<ClassUploadStepProps> = ({
@@ -18,7 +21,10 @@ const ClassUploadStep: React.FC<ClassUploadStepProps> = ({
   photos,
   onPhotosUpdate,
   stepNumber,
-  totalClasses
+  totalClasses,
+  allGroups,
+  groupPhotoCounts,
+  onMovePhotoToGroup,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -161,6 +167,30 @@ const ClassUploadStep: React.FC<ClassUploadStepProps> = ({
         <PhotoPreviewModal
           file={photos[activePreviewIndex]}
           onClose={() => setActivePreviewIndex(null)}
+          onDelete={() => {
+            removePhoto(activePreviewIndex);
+            setActivePreviewIndex(null);
+          }}
+          moveGroups={
+            allGroups && groupPhotoCounts
+              ? allGroups.map((groupName) => ({
+                  name: groupName,
+                  photoCount: groupPhotoCounts[groupName] ?? 0,
+                  isCurrent: groupName === className,
+                }))
+              : undefined
+          }
+          onMoveToGroup={
+            onMovePhotoToGroup
+              ? (targetGroup) => {
+                  const moved = onMovePhotoToGroup(targetGroup, activePreviewIndex);
+                  if (moved) {
+                    setActivePreviewIndex(null);
+                  }
+                  return moved;
+                }
+              : undefined
+          }
         />
       )}
     </WizardStepWrapper>

@@ -371,6 +371,13 @@ export const backendService = {
   deleteAsset: (id: string) => apiFetch<void>(`/assets/${id}`, { method: "DELETE" }),
   listSlideshows: () => apiFetch<StoredSlideshow[]>("/slideshows"),
   loadSlideshow: (id: string) => apiFetch<any>(`/slideshows/${id}`),
+  getRecoverablePhotos: (id: string) =>
+    apiFetch<{ count: number }>(`/slideshows/${encodeURIComponent(id)}/recoverable-photos`),
+  restorePhotos: (id: string) =>
+    apiFetch<{ restoredCount: number; totalPhotos: number }>(
+      `/slideshows/${encodeURIComponent(id)}/restore-photos`,
+      { method: "POST", body: JSON.stringify({}) }
+    ),
   deleteSlideshow: (id: string) => apiFetch<void>(`/slideshows/${id}`, { method: "DELETE" }),
   listMusicFiles: () => apiFetch<StoredFile[]>("/assets?kind=audio"),
   listBackgroundImages: () => apiFetch<StoredFile[]>("/assets?kind=image"),

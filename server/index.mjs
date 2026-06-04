@@ -53,6 +53,77 @@ const mergeClassData = (existingClassData, incomingClassData) => {
   return merged;
 };
 
+const collectReferencedAssetIds = (classData) => {
+  const ids = new Set();
+  if (!classData || typeof classData !== "object") return ids;
+  for (const images of Object.values(classData)) {
+    if (!Array.isArray(images)) continue;
+    for (const image of images) {
+      if (image?.id) ids.add(image.id);
+    }
+  }
+  return ids;
+};
+
+const countClassDataPhotos = (classData) => {
+  if (!classData || typeof classData !== "object") return 0;
+  return Object.values(classData).reduce((total, images) => {
+    return total + (Array.isArray(images) ? images.length : 0);
+  }, 0);
+};
+
+const resolveClassDataForSave = (existingSlideshow, incomingClassData) => {
+  const existingData = existingSlideshow?.classData;
+  const existingCount = countClassDataPhotos(existingData);
+  const incomingCount = countClassDataPhotos(incomingClassData);
+
+  if (existingSlideshow && existingCount > 0 && incomingCount === 0) {
+    return existingData;
+  }
+
+  const merged = existingSlideshow
+    ? mergeClassData(existingData, incomingClassData)
+    : incomingClassData || {};
+
+  if (existingSlideshow && countClassDataPhotos(merged) < existingCount) {
+    console.warn(
+      `Blocked slideshow save that would reduce photos from ${existingCount} to ${countClassDataPhotos(merged)}`
+    );
+    return existingData;
+  }
+
+  return merged;
+};
+
+const mapAssetToClassPhoto = (asset) => ({
+  id: asset.id,
+  name: asset.name,
+  url: `${apiPrefix}/assets/${asset.id}/content`,
+});
+
+const distributePhotosToGroups = (groups, photoAssets) => {
+  const classData = Object.fromEntries((groups || []).map((group) => [group, []]));
+  if (!groups?.length) return classData;
+
+  let groupIndex = 0;
+  for (const asset of photoAssets) {
+    let placed = false;
+    for (let attempt = 0; attempt < groups.length; attempt += 1) {
+      const groupName = groups[(groupIndex + attempt) % groups.length];
+      const items = classData[groupName];
+      if (items.length < MAX_PHOTOS_PER_GROUP) {
+        items.push(mapAssetToClassPhoto(asset));
+        groupIndex = (groupIndex + attempt + 1) % groups.length;
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) break;
+  }
+
+  return classData;
+};
+
 const isIntakeImageFile = (file) => {
   if (file.mimetype?.startsWith("image/")) return true;
   const name = file.originalname || "";
@@ -1247,6 +1318,92 @@ app.get(`${apiPrefix}/slideshows/:id`, async (req, res) => {
   });
 });
 
+app.get(`${apiPrefix}/slideshows/:id/recoverable-photos`, async (req, res) => {
+  const ownerEmail = requireUserEmail(req, res);
+  if (!ownerEmail) return;
+
+  const slideshow = await prisma.slideshow.findUnique({
+    where: { id: req.params.id },
+  });
+  if (!slideshow || slideshow.ownerEmail !== ownerEmail) {
+    return res.status(404).json({ error: "Slideshow not found" });
+  }
+
+  const ownerSlideshows = await prisma.slideshow.findMany({
+    where: { ownerEmail },
+    select: { classData: true },
+  });
+  const referencedIds = new Set();
+  for (const item of ownerSlideshows) {
+    collectReferencedAssetIds(item.classData).forEach((id) => referencedIds.add(id));
+  }
+
+  const orphanPhotos = await prisma.asset.findMany({
+    where: {
+      ownerEmail,
+      kind: "photo",
+      createdAt: { gte: slideshow.createdAt },
+    },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+
+  const recoverableIds = orphanPhotos.filter((asset) => !referencedIds.has(asset.id));
+  res.json({ count: recoverableIds.length });
+});
+
+app.post(`${apiPrefix}/slideshows/:id/restore-photos`, async (req, res) => {
+  const ownerEmail = requireUserEmail(req, res);
+  if (!ownerEmail) return;
+
+  const slideshow = await prisma.slideshow.findUnique({
+    where: { id: req.params.id },
+  });
+  if (!slideshow || slideshow.ownerEmail !== ownerEmail) {
+    return res.status(404).json({ error: "Slideshow not found" });
+  }
+
+  const groups = Array.isArray(slideshow.classes) ? slideshow.classes : [];
+  if (groups.length === 0) {
+    return res.status(400).json({ error: "Slideshow has no image groups configured" });
+  }
+
+  const ownerSlideshows = await prisma.slideshow.findMany({
+    where: { ownerEmail },
+    select: { classData: true },
+  });
+  const referencedIds = new Set();
+  for (const item of ownerSlideshows) {
+    collectReferencedAssetIds(item.classData).forEach((id) => referencedIds.add(id));
+  }
+
+  const candidatePhotos = await prisma.asset.findMany({
+    where: {
+      ownerEmail,
+      kind: "photo",
+      createdAt: { gte: slideshow.createdAt },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  const orphanPhotos = candidatePhotos.filter((asset) => !referencedIds.has(asset.id));
+  if (orphanPhotos.length === 0) {
+    return res.json({ restoredCount: 0, totalPhotos: countClassDataPhotos(slideshow.classData) });
+  }
+
+  const restoredClassData = distributePhotosToGroups(groups, orphanPhotos);
+  const mergedClassData = mergeClassData(slideshow.classData, restoredClassData);
+
+  const saved = await prisma.slideshow.update({
+    where: { id: slideshow.id },
+    data: { classData: mergedClassData },
+  });
+
+  res.json({
+    restoredCount: orphanPhotos.length,
+    totalPhotos: countClassDataPhotos(saved.classData),
+  });
+});
+
 app.post(`${apiPrefix}/slideshows`, async (req, res) => {
   const ownerEmail = requireUserEmail(req, res);
   if (!ownerEmail) return;
@@ -1279,9 +1436,7 @@ app.post(`${apiPrefix}/slideshows`, async (req, res) => {
     return res.status(404).json({ error: "Slideshow not found" });
   }
 
-  const mergedClassData = existingSlideshow
-    ? mergeClassData(existingSlideshow.classData, baseData.classData)
-    : baseData.classData;
+  const mergedClassData = resolveClassDataForSave(existingSlideshow, baseData.classData);
 
   const saved = existingSlideshow
     ? await prisma.slideshow.update({
